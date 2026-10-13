@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/documents/{documentId} {
+      function owner() { return request.auth != null && request.auth.uid == userId; }
+      function valid() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['kind', 'record_id', 'payload', 'deleted', 'revision', 'updated_at'])
+          && d.kind in ['book', 'preferences'] && d.record_id is string
+          && d.record_id.matches('^[A-Za-z0-9_-]{1,100}$')
+          && documentId == d.kind + '_' + d.record_id
+          && d.payload is map && d.deleted is bool && d.revision is int
+          && d.updated_at is number
+          && (d.deleted || d.kind == 'preferences' || d.payload.localOnly == true);
+      }
+      allow read: if owner();
+      allow create: if owner() && valid() && request.resource.data.revision == 1;
+      allow update: if owner() && valid() && request.resource.data.revision == resource.data.revision + 1
+        && request.resource.data.kind == resource.data.kind && request.resource.data.record_id == resource.data.record_id;
+      // Tombstones retain revision history so another device cannot resurrect a deletion.
+      allow delete: if false;
+    }
+  }
+}

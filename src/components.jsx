@@ -1,21 +1,427 @@
-import React, { useEffect, useRef } from 'react';
-import { X, Leaf, BookOpen, TreePine, Moon, Sun, Check, Plus, Minus } from 'lucide-react';
-import { PRESETS, clamp } from './engine';
-export function Logo({ compact = false }) { return <div className="brand"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 40V20M24 36C18 31 12 32 6 34V16C13 14 19 16 24 21C29 16 35 14 42 16V34C35 32 29 33 24 36ZM24 21C16 20 14 13 14 7C21 8 25 13 24 21ZM24 21C32 20 34 13 34 7C27 8 23 13 24 21Z"/></svg>{!compact && <span>page grove<span className="brand-hq">HQ</span></span>}</div>; }
-export function GroveArt() { return <svg className="grove-art" viewBox="0 0 460 240" aria-hidden="true"><defs><linearGradient id="hill" x2="0" y2="1"><stop stopColor="#c9d4b4"/><stop offset="1" stopColor="#e2e6d4"/></linearGradient></defs><circle cx="303" cy="83" r="48" fill="#e8d6a5"/><path d="M0 200Q130 88 265 168Q390 115 460 185V240H0Z" fill="url(#hill)"/><path d="M0 222Q126 159 252 202Q371 149 460 218V240H0Z" fill="#b2c1a5"/><g stroke="#49664d" strokeWidth="3" strokeLinecap="round"><path d="M322 208V88M322 160L285 126M322 139L350 113M75 218V114M75 173L53 152M75 157L94 136M402 222V156"/></g><g fill="#668261"><ellipse cx="305" cy="109" rx="47" ry="64"/><ellipse cx="340" cy="112" rx="31" ry="48"/><ellipse cx="71" cy="141" rx="31" ry="44"/><ellipse cx="93" cy="150" rx="22" ry="30"/><ellipse cx="401" cy="175" rx="24" ry="36"/></g><g stroke="#35573f" strokeWidth="3" fill="none"><path d="M322 208V101M322 162L297 135M322 138L343 120M75 217V139M75 179L57 162M75 162L90 150M402 222V175"/></g><path d="M144 199L193 182L238 199V228L192 214L144 231Z" fill="#f7f0d9" stroke="#62785c" strokeWidth="2"/><path d="M193 183V214M153 200L182 190M153 207L182 197M153 214L182 204M202 190L229 201M202 198L229 208" stroke="#b5b393" strokeWidth="1.5"/><path d="M184 182C176 165 186 155 199 151C203 166 197 179 184 182Z" fill="#799565"/><path d="M184 183L197 154" stroke="#456241" fill="none"/><g fill="#ece8d3"><circle cx="119" cy="210" r="2"/><circle cx="365" cy="216" r="3"/></g></svg>; }
-export function Cover({ book, small = false }) { return <div className={`book-cover cover-${book.coverStyle ?? 3} ${small ? 'small-cover' : ''}`}>{book.cover ? <img src={book.cover} alt={`${book.title} cover`} loading="lazy"/> : <><div className="cover-border"/><span className="cover-author">{book.author}</span><span className="cover-title">{book.title}</span><div className="cover-drawing">{book.coverStyle === 1 ? <><span className="rabbit">♧</span><span className="cover-stars">✧ · ✦ · ✧</span></> : book.coverStyle === 2 ? <><TreePine/><span className="water-lines">﹏﹏﹏</span></> : <><Leaf/><Leaf/><Leaf/></>}</div><span className="cover-edition">{book.demo ? 'THE GROVE COLLECTION' : 'YOUR PERSONAL LIBRARY'}</span></>}</div>; }
-export function IconButton({ icon: Icon, label, children, ...props }) { return <button className="icon-button" aria-label={label} title={label} {...props}><Icon size={20}/>{children}</button>; }
-export function Dialog({ title, children, onClose, wide = false, className = '' }) {
+import React, { useEffect, useRef } from "react";
+import {
+  X,
+  Leaf,
+  BookOpen,
+  TreePine,
+  Moon,
+  Sun,
+  Check,
+  Plus,
+  Minus,
+} from "lucide-react";
+import { PRESETS, clamp } from "./engine";
+export function Logo({ compact = false }) {
+  return (
+    <div className="brand">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M24 40V20M24 36C18 31 12 32 6 34V16C13 14 19 16 24 21C29 16 35 14 42 16V34C35 32 29 33 24 36ZM24 21C16 20 14 13 14 7C21 8 25 13 24 21ZM24 21C32 20 34 13 34 7C27 8 23 13 24 21Z" />
+      </svg>
+      {!compact && (
+        <span>
+          page grove<span className="brand-hq">HQ</span>
+        </span>
+      )}
+    </div>
+  );
+}
+export function GroveArt() {
+  return (
+    <svg className="grove-art" viewBox="0 0 460 240" aria-hidden="true">
+      <defs>
+        <linearGradient id="hill" x2="0" y2="1">
+          <stop stopColor="#c9d4b4" />
+          <stop offset="1" stopColor="#e2e6d4" />
+        </linearGradient>
+      </defs>
+      <circle cx="303" cy="83" r="48" fill="#e8d6a5" />
+      <path
+        d="M0 200Q130 88 265 168Q390 115 460 185V240H0Z"
+        fill="url(#hill)"
+      />
+      <path d="M0 222Q126 159 252 202Q371 149 460 218V240H0Z" fill="#b2c1a5" />
+      <g stroke="#49664d" strokeWidth="3" strokeLinecap="round">
+        <path d="M322 208V88M322 160L285 126M322 139L350 113M75 218V114M75 173L53 152M75 157L94 136M402 222V156" />
+      </g>
+      <g fill="#668261">
+        <ellipse cx="305" cy="109" rx="47" ry="64" />
+        <ellipse cx="340" cy="112" rx="31" ry="48" />
+        <ellipse cx="71" cy="141" rx="31" ry="44" />
+        <ellipse cx="93" cy="150" rx="22" ry="30" />
+        <ellipse cx="401" cy="175" rx="24" ry="36" />
+      </g>
+      <g stroke="#35573f" strokeWidth="3" fill="none">
+        <path d="M322 208V101M322 162L297 135M322 138L343 120M75 217V139M75 179L57 162M75 162L90 150M402 222V175" />
+      </g>
+      <path
+        d="M144 199L193 182L238 199V228L192 214L144 231Z"
+        fill="#f7f0d9"
+        stroke="#62785c"
+        strokeWidth="2"
+      />
+      <path
+        d="M193 183V214M153 200L182 190M153 207L182 197M153 214L182 204M202 190L229 201M202 198L229 208"
+        stroke="#b5b393"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M184 182C176 165 186 155 199 151C203 166 197 179 184 182Z"
+        fill="#799565"
+      />
+      <path d="M184 183L197 154" stroke="#456241" fill="none" />
+      <g fill="#ece8d3">
+        <circle cx="119" cy="210" r="2" />
+        <circle cx="365" cy="216" r="3" />
+      </g>
+    </svg>
+  );
+}
+export function Cover({ book, small = false }) {
+  return (
+    <div
+      className={`book-cover cover-${book.coverStyle ?? 3} ${small ? "small-cover" : ""}`}
+    >
+      {book.cover ? (
+        <img src={book.cover} alt={`${book.title} cover`} loading="lazy" />
+      ) : (
+        <>
+          <div className="cover-border" />
+          <span className="cover-author">{book.author}</span>
+          <span className="cover-title">{book.title}</span>
+          <div className="cover-drawing">
+            {book.coverStyle === 1 ? (
+              <>
+                <span className="rabbit">♧</span>
+                <span className="cover-stars">✧ · ✦ · ✧</span>
+              </>
+            ) : book.coverStyle === 2 ? (
+              <>
+                <TreePine />
+                <span className="water-lines">﹏﹏﹏</span>
+              </>
+            ) : (
+              <>
+                <Leaf />
+                <Leaf />
+                <Leaf />
+              </>
+            )}
+          </div>
+          <span className="cover-edition">
+            {book.demo ? "THE GROVE COLLECTION" : "YOUR PERSONAL LIBRARY"}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+export function IconButton({ icon: Icon, label, children, ...props }) {
+  return (
+    <button className="icon-button" aria-label={label} title={label} {...props}>
+      <Icon size={20} />
+      {children}
+    </button>
+  );
+}
+export function Dialog({
+  title,
+  children,
+  onClose,
+  wide = false,
+  className = "",
+}) {
   const ref = useRef();
-  useEffect(() => { const previous = document.activeElement; const node = ref.current; node.showModal(); node.querySelector('button,input,textarea,select')?.focus(); return () => { node.close(); previous?.focus?.(); }; }, []);
-  return <dialog ref={ref} className={`dialog ${wide ? 'wide' : ''} ${className}`} onCancel={e => { e.preventDefault(); onClose(); }} onClick={e => { if (e.target === ref.current) { const r = ref.current.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) onClose(); } }}><header className="dialog-header"><h2>{title}</h2><IconButton icon={X} label="Close dialog" onClick={onClose}/></header><div className="dialog-content">{children}</div></dialog>;
+  useEffect(() => {
+    const previous = document.activeElement;
+    const node = ref.current;
+    node.showModal();
+    node.querySelector("button,input,textarea,select")?.focus();
+    return () => {
+      node.close();
+      previous?.focus?.();
+    };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className={`dialog ${wide ? "wide" : ""} ${className}`}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === ref.current) {
+          const r = ref.current.getBoundingClientRect();
+          if (
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom
+          )
+            onClose();
+        }
+      }}
+    >
+      <header className="dialog-header">
+        <h2>{title}</h2>
+        <IconButton icon={X} label="Close dialog" onClick={onClose} />
+      </header>
+      <div className="dialog-content">{children}</div>
+    </dialog>
+  );
 }
-export function Toggle({ label, description, value, onChange }) { return <label className="toggle-row"><span><strong>{label}</strong>{description && <small>{description}</small>}</span><input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}/><span className="switch" aria-hidden="true"/></label>; }
+export function Toggle({ label, description, value, onChange }) {
+  return (
+    <label className="toggle-row">
+      <span>
+        <strong>{label}</strong>
+        {description && <small>{description}</small>}
+      </span>
+      <input
+        type="checkbox"
+        checked={value}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="switch" aria-hidden="true" />
+    </label>
+  );
+}
 export function SpeedControl({ settings, onChange, compact = false }) {
-  const wpm = settings.wpm; const [draft, setDraft] = React.useState(String(wpm)); const editing = useRef(false);
-  useEffect(() => { if (!editing.current) setDraft(String(wpm)); }, [wpm]);
-  function commit() { editing.current = false; const next = draft === '' ? wpm : Math.round(clamp(draft, 100, 800)); setDraft(String(next)); if (next !== wpm) onChange({ wpm: next }); }
-  return <section className={`speed-control ${compact ? 'compact' : ''}`} aria-label="Reading speed"><div className="speed-label"><span>Reading pace</span><label className="number-speed"><input aria-label="Words per minute" type="number" min="100" max="800" step="1" value={draft} onFocus={() => { editing.current = true; }} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} onChange={e => { const value = e.target.value; setDraft(value); if (Number.isInteger(+value) && +value >= 100 && +value <= 800) onChange({ wpm: +value }); }}/><span>WPM</span></label></div><div className="speed-range"><IconButton icon={Minus} label="Decrease speed by 10 WPM" onClick={() => onChange({ wpm: clamp(wpm - 10, 100, 800) })}/><input aria-label="Reading pace slider" type="range" min="100" max="800" step="10" value={wpm} onChange={e => onChange({ wpm: +e.target.value })}/><IconButton icon={Plus} label="Increase speed by 10 WPM" onClick={() => onChange({ wpm: clamp(wpm + 10, 100, 800) })}/></div>{!compact && <div className="presets">{PRESETS.map(speed => <button key={speed} className={wpm === speed ? 'selected' : ''} onClick={() => onChange({ wpm: speed })}>{speed}</button>)}</div>}<small>Base pace. Natural pauses add time between sentences.</small></section>;
+  const wpm = settings.wpm;
+  const [draft, setDraft] = React.useState(String(wpm));
+  const editing = useRef(false);
+  useEffect(() => {
+    if (!editing.current) setDraft(String(wpm));
+  }, [wpm]);
+  function commit() {
+    editing.current = false;
+    const next = draft === "" ? wpm : Math.round(clamp(draft, 100, 800));
+    setDraft(String(next));
+    if (next !== wpm) onChange({ wpm: next });
+  }
+  return (
+    <section
+      className={`speed-control ${compact ? "compact" : ""}`}
+      aria-label="Reading speed"
+    >
+      <div className="speed-label">
+        <span>Reading pace</span>
+        <label className="number-speed">
+          <input
+            aria-label="Words per minute"
+            type="number"
+            min="100"
+            max="800"
+            step="1"
+            value={draft}
+            onFocus={() => {
+              editing.current = true;
+            }}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            onChange={(e) => {
+              const value = e.target.value;
+              setDraft(value);
+              if (Number.isInteger(+value) && +value >= 100 && +value <= 800)
+                onChange({ wpm: +value });
+            }}
+          />
+          <span>WPM</span>
+        </label>
+      </div>
+      <div className="speed-range">
+        <IconButton
+          icon={Minus}
+          label="Decrease speed by 10 WPM"
+          onClick={() => onChange({ wpm: clamp(wpm - 10, 100, 800) })}
+        />
+        <input
+          aria-label="Reading pace slider"
+          type="range"
+          min="100"
+          max="800"
+          step="10"
+          value={wpm}
+          onChange={(e) => onChange({ wpm: +e.target.value })}
+        />
+        <IconButton
+          icon={Plus}
+          label="Increase speed by 10 WPM"
+          onClick={() => onChange({ wpm: clamp(wpm + 10, 100, 800) })}
+        />
+      </div>
+      {!compact && (
+        <div className="presets">
+          {PRESETS.map((speed) => (
+            <button
+              key={speed}
+              className={wpm === speed ? "selected" : ""}
+              onClick={() => onChange({ wpm: speed })}
+            >
+              {speed}
+            </button>
+          ))}
+        </div>
+      )}
+      <small>Base pace. Natural pauses add time between sentences.</small>
+    </section>
+  );
 }
-export function ReaderSettings({ settings, onChange }) { return <><SpeedControl settings={settings} onChange={onChange}/><div className="settings-heading">Reading comfort</div><div className="theme-options">{[['cream', Sun, 'Daylight'], ['sepia', BookOpen, 'Parchment'], ['dark', Moon, 'Nightfall']].map(([theme, Icon, label]) => <button key={theme} className={settings.theme === theme ? 'selected' : ''} onClick={() => onChange({ theme })}><Icon size={18}/>{label}{settings.theme === theme && <Check size={14}/>}</button>)}</div><label className="field range-field">Word size <span>{settings.fontSize}px</span><input aria-label="Word size" type="range" min="28" max="80" step="2" value={settings.fontSize} onChange={e => onChange({ fontSize: +e.target.value })}/></label><Toggle label="Anchor letter" description="Keep a highlighted letter at a steady focal point." value={settings.highlight} onChange={highlight => onChange({ highlight })}/><Toggle label="Focus guides" value={settings.guides} onChange={guides => onChange({ guides })}/><Toggle label="Natural punctuation pauses" value={settings.punctuation} onChange={punctuation => onChange({ punctuation })}/>{settings.punctuation && <label className="field range-field">Pause length <span>{settings.pauseStrength === 0 ? 'None' : settings.pauseStrength < 1 ? 'Light' : settings.pauseStrength === 1 ? 'Balanced' : 'Unhurried'}</span><input aria-label="Pause length" type="range" min="0" max="2" step=".25" value={settings.pauseStrength} onChange={e => onChange({ pauseStrength: +e.target.value })}/></label>}<Toggle label="More time for long words" value={settings.longWords} onChange={longWords => onChange({ longWords })}/><Toggle label="Countdown before playing" value={settings.countdown} onChange={countdown => onChange({ countdown })}/><Toggle label="Replay sentence on resume" value={settings.replay} onChange={replay => onChange({ replay })}/><Toggle label="Pause for illustrations and tables" description="PDF originals are available in passage view." value={settings.mediaPause} onChange={mediaPause => onChange({ mediaPause })}/><Toggle label="Pause at chapter endings" description="For PDFs, pause between pages." value={settings.chapterPause} onChange={chapterPause => onChange({ chapterPause })}/></>; }
-export function DownloadLink({ blob, filename, children, ...props }) { const [url, setURL] = React.useState(''); useEffect(() => { if (!blob) return; const next = URL.createObjectURL(blob); setURL(next); return () => URL.revokeObjectURL(next); }, [blob]); return url ? <a href={url} download={filename} {...props}>{children}</a> : null; }
+export function ReaderSettings({ settings, onChange }) {
+  return (
+    <>
+      <label className="field">
+        Presentation style
+        <select
+          value={settings.presentation || "word"}
+          onChange={(e) => onChange({ presentation: e.target.value })}
+        >
+          <option value="word">One word</option>
+          <option value="phrase">Short phrases</option>
+          <option value="sentence">Full sentences</option>
+          <option value="guided">Guided passage</option>
+        </select>
+      </label>
+      {settings.presentation === "phrase" && (
+        <label className="field">
+          Words per phrase
+          <select
+            value={settings.phraseSize}
+            onChange={(e) => onChange({ phraseSize: +e.target.value })}
+          >
+            {[2, 3, 4, 5, 6].map((n) => (
+              <option value={n} key={n}>
+                {n} words
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <SpeedControl settings={settings} onChange={onChange} />
+      <Toggle
+        label="Show sentence context when paused"
+        description="Keep the surrounding sentence close at hand."
+        value={settings.contextOnPause}
+        onChange={(contextOnPause) => onChange({ contextOnPause })}
+      />
+      <Toggle
+        label="Touch gestures"
+        description="Swipe left for the next sentence, right to replay."
+        value={settings.gestures}
+        onChange={(gestures) => onChange({ gestures })}
+      />
+      <div className="settings-heading">Reading comfort</div>
+      <div className="theme-options">
+        {[
+          ["cream", Sun, "Daylight"],
+          ["sepia", BookOpen, "Parchment"],
+          ["dark", Moon, "Nightfall"],
+        ].map(([theme, Icon, label]) => (
+          <button
+            key={theme}
+            className={settings.theme === theme ? "selected" : ""}
+            onClick={() => onChange({ theme })}
+          >
+            <Icon size={18} />
+            {label}
+            {settings.theme === theme && <Check size={14} />}
+          </button>
+        ))}
+      </div>
+      <label className="field range-field">
+        Word size <span>{settings.fontSize}px</span>
+        <input
+          aria-label="Word size"
+          type="range"
+          min="28"
+          max="80"
+          step="2"
+          value={settings.fontSize}
+          onChange={(e) => onChange({ fontSize: +e.target.value })}
+        />
+      </label>
+      <Toggle
+        label="Anchor letter"
+        description="Keep a highlighted letter at a steady focal point."
+        value={settings.highlight}
+        onChange={(highlight) => onChange({ highlight })}
+      />
+      <Toggle
+        label="Focus guides"
+        value={settings.guides}
+        onChange={(guides) => onChange({ guides })}
+      />
+      <Toggle
+        label="Natural punctuation pauses"
+        value={settings.punctuation}
+        onChange={(punctuation) => onChange({ punctuation })}
+      />
+      {settings.punctuation && (
+        <label className="field range-field">
+          Pause length{" "}
+          <span>
+            {settings.pauseStrength === 0
+              ? "None"
+              : settings.pauseStrength < 1
+                ? "Light"
+                : settings.pauseStrength === 1
+                  ? "Balanced"
+                  : "Unhurried"}
+          </span>
+          <input
+            aria-label="Pause length"
+            type="range"
+            min="0"
+            max="2"
+            step=".25"
+            value={settings.pauseStrength}
+            onChange={(e) => onChange({ pauseStrength: +e.target.value })}
+          />
+        </label>
+      )}
+      <Toggle
+        label="More time for long words"
+        value={settings.longWords}
+        onChange={(longWords) => onChange({ longWords })}
+      />
+      <Toggle
+        label="Countdown before playing"
+        value={settings.countdown}
+        onChange={(countdown) => onChange({ countdown })}
+      />
+      <Toggle
+        label="Replay sentence on resume"
+        value={settings.replay}
+        onChange={(replay) => onChange({ replay })}
+      />
+      <Toggle
+        label="Pause for illustrations and tables"
+        description="PDF originals are available in passage view."
+        value={settings.mediaPause}
+        onChange={(mediaPause) => onChange({ mediaPause })}
+      />
+      <Toggle
+        label="Pause at chapter endings"
+        description="For PDFs, pause between pages."
+        value={settings.chapterPause}
+        onChange={(chapterPause) => onChange({ chapterPause })}
+      />
+    </>
+  );
+}
+export function DownloadLink({ blob, filename, children, ...props }) {
+  const [url, setURL] = React.useState("");
+  useEffect(() => {
+    if (!blob) return;
+    const next = URL.createObjectURL(blob);
+    setURL(next);
+    return () => URL.revokeObjectURL(next);
+  }, [blob]);
+  return url ? (
+    <a href={url} download={filename} {...props}>
+      {children}
+    </a>
+  ) : null;
+}

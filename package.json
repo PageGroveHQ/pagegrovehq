@@ -1,7 +1,8 @@
 {
   "name": "page-grove-hq",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
+  "overrides": {"@grpc/grpc-js": "1.14.6"},
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -12,6 +13,7 @@
     "predev": "node scripts/prepare-resources.mjs"
   },
   "dependencies": {
+    "firebase": "^13.0.0",
     "idb": "^8.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
@@ -29,8 +31,10 @@
     "@tesseract.js-data/por": "^1.0.0",
     "@tesseract.js-data/spa": "^1.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^26.1.0",
     "pdf-lib": "^1.17.1",
+    "prettier": "^3.9.10",
     "sharp": "^0.35.5",
     "vite": "^7.1.0",
     "vitest": "^5.0.4"

@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "provider": "firebase",
+  "bookStorage": "device",
+  "firebase": {
+    "apiKey": "AIzaSyAfeAFxYZaVohHahJ09o-67EeVMcQiSxuU",
+    "authDomain": "page-grove-hq.firebaseapp.com",
+    "projectId": "page-grove-hq",
+    "storageBucket": "page-grove-hq.firebasestorage.app",
+    "messagingSenderId": "373216521645",
+    "appId": "1:373216521645:web:6e137e5ef38f6274700524"
+  },
+  "aiEnabled": false,
+  "serverOcrEnabled": false
+}

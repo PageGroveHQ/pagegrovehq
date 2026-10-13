@@ -1,4 +1,4 @@
-import { makeBook, textBlocks } from './engine';
+import { makeBook, textBlocks } from "./engine";
 const alice = `Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, “and what is the use of a book,” thought Alice “without pictures or conversations?”
 
 So she was considering in her own mind (as well as she could, for the hot day made her feel very sleepy and stupid), whether the pleasure of making a daisy-chain would be worth the trouble of getting up and picking the daisies, when suddenly a White Rabbit with pink eyes ran close by her.
@@ -16,9 +16,54 @@ const walden = `When I wrote the following pages, or rather the bulk of them, I 
 I should not obtrude my affairs so much on the notice of my readers if very particular inquiries had not been made by my townsmen concerning my mode of life, which some would call impertinent, though they do not appear to me at all impertinent, but, considering the circumstances, very natural and pertinent.
 
 Some have asked what I got to eat; if I did not feel lonesome; if I was not afraid; and the like. Others have been curious to learn what portion of my income I devoted to charitable purposes; and some, who have large families, how many poor children I maintained. I will therefore ask those of my readers who feel no particular interest in me to pardon me if I undertake to answer some of these questions in this book.`;
-export function sampleBooks() { return [{ title: 'The Secret Garden', author: 'Frances Hodgson Burnett', text: garden, chapter: 'There is no one left', coverStyle: 0 }, { title: 'Alice’s Adventures in Wonderland', author: 'Lewis Carroll', text: alice, chapter: 'Down the rabbit-hole', coverStyle: 1 }, { title: 'Walden', author: 'Henry David Thoreau', text: walden, chapter: 'Economy', coverStyle: 2 }].map(({ text, chapter, ...meta }) => makeBook({ ...meta, demo: true, format: 'SAMPLE', chapters: [{ title: chapter, blocks: textBlocks(text) }] })); }
-export function practiceBook() { return makeBook({ title: 'Find your reading rhythm', author: 'Page Grove HQ', practice: true, format: 'PRACTICE', chapters: [{ title: 'A walk through the grove', blocks: textBlocks(`A narrow path wound through the trees. Morning light rested on the leaves, and a small bird waited on the fence. Maya carried a green notebook in her pocket. She had come to the grove to find a quiet place to write.
+export function sampleBooks() {
+  return [
+    {
+      title: "The Secret Garden",
+      author: "Frances Hodgson Burnett",
+      text: garden,
+      chapter: "There is no one left",
+      coverStyle: 0,
+    },
+    {
+      title: "Alice’s Adventures in Wonderland",
+      author: "Lewis Carroll",
+      text: alice,
+      chapter: "Down the rabbit-hole",
+      coverStyle: 1,
+    },
+    {
+      title: "Walden",
+      author: "Henry David Thoreau",
+      text: walden,
+      chapter: "Economy",
+      coverStyle: 2,
+    },
+  ].map(({ text, chapter, ...meta }) =>
+    makeBook({
+      ...meta,
+      demo: true,
+      format: "SAMPLE",
+      chapters: [{ title: chapter, blocks: textBlocks(text) }],
+    }),
+  );
+}
+export function practiceBook() {
+  return makeBook({
+    title: "Find your reading rhythm",
+    author: "Page Grove HQ",
+    practice: true,
+    format: "PRACTICE",
+    chapters: [
+      {
+        title: "A walk through the grove",
+        blocks:
+          textBlocks(`A narrow path wound through the trees. Morning light rested on the leaves, and a small bird waited on the fence. Maya carried a green notebook in her pocket. She had come to the grove to find a quiet place to write.
 
 At the end of the path stood an old wooden bench. Beside it, someone had planted rosemary. Maya sat down, opened her notebook, and wrote three things she could hear: the wind, the bird, and a bicycle passing on the road.
 
-She stayed for ten minutes. Before leaving, she tucked a fallen leaf between the pages. It would remind her that a little attention could change an ordinary morning.`) }] }); }
+She stayed for ten minutes. Before leaving, she tucked a fallen leaf between the pages. It would remind her that a little attention could change an ordinary morning.`),
+      },
+    ],
+  });
+}

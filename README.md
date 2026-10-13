@@ -16,6 +16,11 @@ Add an EPUB, PDF, FB2, TXT, Markdown, or HTML file, or paste text. Review the im
 - Automatic pause when the document becomes hidden or loses focus. Word timing never fast-forwards to catch up after a slow frame.
 - IndexedDB persistence and atomic backup restore. Backups contain extracted books, illustrations, settings, positions, bookmarks, and statistics. Original uploaded files are retained locally and separately downloadable, but excluded from backups.
 - Offline app shell and all bundled PDF resources, isolated service worker scope, installable web manifest.
+- Reading desk with a growing grove, session history and reading insights; no streak penalties.
+- Saved and per-book profiles, word/phrase/sentence/guided reading, paused context, touch gestures and compact playback controls.
+- Highlights with editable notes, a searchable notebook, Markdown export, English dictionary lookup and vocabulary review.
+- Multiple-file import queues, duplicate detection, extraction repair with stable note references, tags, want-to-read shelves, custom covers and manual ordering.
+- Optional Firebase Spark accounts and private progress/note/settings sync; book files remain on the device. Re-import the same original file to reconnect its synced reading record on another device.
 
 ### Important behavior
 
@@ -25,7 +30,9 @@ Add an EPUB, PDF, FB2, TXT, Markdown, or HTML file, or paste text. Review the im
 
 **Limits:** 100 MB input files, 180 MB expanded EPUBs, and 1,000 PDF pages. DRM-protected EPUBs and Kindle MOBI/AZW/KFX are not supported: use an unprotected EPUB edition you have permission to read. HTML imports omit external images; Markdown is treated as readable text. Complex layouts, equations, and some fixed-layout books are best reviewed in passage view. Sentence heuristics may treat abbreviations as sentence endings. This app makes no clinical or speed/comprehension guarantees.
 
-**Storage:** this is a browser-local library, with no accounts or automatic cloud synchronization. Backup/restore transfers it between devices. Clearing browser site data can remove it. Keep original files and export regular backups. GitHub Pages project sites on one account share an origin: the database, cache names, and service worker are specific to this project, but origin-level storage quota and security remain shared. Use a dedicated domain for stronger isolation.
+**Storage:** books remain in a browser-local library. Firebase Spark optionally syncs library records, saved excerpts, notes, progress and preferences after explicit opt-in. Full book files, extracted text and illustrations do not sync. Backup/restore transfers full libraries between devices. Clearing browser site data can remove local books, which the cloud index cannot reconstruct. Keep original files and export regular backups. GitHub Pages project sites on one account share an origin: the database, cache names, and service worker are specific to this project, but origin-level storage quota and security remain shared. Use a dedicated domain for stronger isolation. See [Firebase setup](docs/backend-setup.md) for quotas, privacy and verification limits.
+
+**Optional AI and server processing:** these are not enabled on the Spark deployment. Excerpt-selection and document-tool interfaces show their availability honestly. Local PDF OCR continues to work without a server.
 
 ## Develop
 

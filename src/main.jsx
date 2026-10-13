@@ -1,6 +1,10 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.jsx';
-import './styles.css';
-createRoot(document.getElementById('root')).render(<App/>);
-if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(console.warn);
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+import "./styles.css";
+import "./upgrade.css";
+createRoot(document.getElementById("root")).render(<App />);
+if ("serviceWorker" in navigator && import.meta.env.PROD)
+  navigator.serviceWorker
+    .register("./sw.js", { scope: "./" })
+    .catch(console.warn);
