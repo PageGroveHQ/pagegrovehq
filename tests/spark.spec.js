@@ -79,9 +79,11 @@ test("Spark account screen explains local files and optional private sync", asyn
     .getByRole("button", { name: "Account & sync", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Email me a sign-in link" }),
+    page.getByRole("button", { name: "Continue with Google" }),
   ).toBeVisible();
-  await expect(page.getByText(/Book files stay on the device/)).toBeVisible();
+  await expect(
+    page.getByText(/Connect Google Drive for your book files/),
+  ).toBeVisible();
   await expect(
     page.getByRole("checkbox", { name: "Also sync original uploaded files" }),
   ).toHaveCount(0);

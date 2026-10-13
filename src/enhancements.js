@@ -111,6 +111,7 @@ export function repairBook(original, chapters) {
     highlights: (original.highlights || []).map(relocate),
     contentUpdatedAt: Date.now(),
     cloudContentDirty: !!book.cloudContentPath,
+    ...(book.driveSource ? { driveEdited: true, offlineAvailable: true } : {}),
     completed: false,
   };
 }

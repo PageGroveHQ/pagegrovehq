@@ -139,10 +139,14 @@ export default function BookDetails({
               Public-domain sample excerpt, not the complete book.
             </p>
           )}
-          {book.cloudContentPath && (
+          {(book.cloudContentPath || book.driveSource) && (
             <div className="notice">
               <strong>
-                {offline ? "Available offline" : "Stored privately in Firebase"}
+                {offline
+                  ? "Available offline"
+                  : book.driveSource
+                    ? "Stored in your Google Drive"
+                    : "Stored privately in Firebase"}
               </strong>
               <p>
                 {offline
@@ -168,6 +172,50 @@ export default function BookDetails({
                 {offline ? "Remove offline copy" : "Keep available offline"}
               </button>
             </div>
+          )}
+          {book.driveSource?.missing && (
+            <p className="notice">
+              This file was not found in the selected Drive folder. Your notes
+              and reading position are retained. Restore the file in Drive or
+              use its offline copy.
+            </p>
+          )}
+          {book.driveUpdate && (
+            <div className="notice">
+              <strong>The Drive file changed</strong>
+              <p>
+                Your notes and saved position remain. After loading the update,
+                review them against the new edition. Local passage repairs will
+                be replaced.
+              </p>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await cloud.updateDriveBook(book);
+                    await onChanged();
+                    onClose();
+                    notify(
+                      "Drive file updated. Review your saved annotations against this edition.",
+                    );
+                  } catch (e) {
+                    notify(e.message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Use updated Drive file
+              </button>
+            </div>
+          )}
+          {book.driveEdited && (
+            <p className="muted">
+              Your repaired text is kept offline on this device. Drive remains
+              unchanged; text repairs are not uploaded to Firebase.
+            </p>
           )}
           <button className="primary" onClick={() => onOpen(book)}>
             <BookOpen size={17} />
@@ -270,7 +318,11 @@ export default function BookDetails({
       />
       <div className="section-title">
         <h2>Inside the book</h2>
-        <button className="text-button" onClick={onRepair}>
+        <button
+          className="text-button"
+          disabled={!book.chapters.some((c) => c.blocks.length)}
+          onClick={onRepair}
+        >
           <Pencil size={15} />
           Repair extracted text
         </button>

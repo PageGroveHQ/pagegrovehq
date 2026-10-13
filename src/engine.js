@@ -338,6 +338,25 @@ export function validateBackup(data) {
     book.contentHash =
       typeof b.contentHash === "string" ? b.contentHash.slice(0, 100) : "";
     book.separateCopy = !!b.separateCopy;
+    if (
+      b.driveSource &&
+      /^[\w-]{1,200}$/.test(b.driveSource.fileId || "") &&
+      typeof b.driveSource.ownerId === "string"
+    ) {
+      book.driveSource = {
+        fileId: b.driveSource.fileId,
+        ownerId: b.driveSource.ownerId.slice(0, 128),
+        folderId: String(b.driveSource.folderId || "").slice(0, 200),
+        name: String(b.driveSource.name || b.sourceName || "").slice(0, 500),
+        modifiedTime: String(b.driveSource.modifiedTime || "").slice(0, 50),
+        checksum: String(b.driveSource.checksum || "").slice(0, 100),
+        size: Number(b.driveSource.size) || 0,
+        missing: !!b.driveSource.missing,
+      };
+      // A full backup intentionally restores as an offline copy.
+      book.offlineAvailable = true;
+      book.driveEdited = !!b.driveEdited;
+    }
     book.syncCanonicalId =
       typeof b.syncCanonicalId === "string"
         ? b.syncCanonicalId.slice(0, 100)

@@ -9,6 +9,9 @@ export function sameBook(a, b) {
     );
   if (a.separateCopy || b.separateCopy) return false;
   return !!(
+    (a.driveSource?.fileId &&
+      a.driveSource.fileId === b.driveSource?.fileId &&
+      a.driveSource.ownerId === b.driveSource.ownerId) ||
     (a.sourceHash && a.sourceHash === b.sourceHash) ||
     (a.contentHash &&
       a.contentHash === b.contentHash &&
@@ -99,6 +102,14 @@ export function combineCopies(local, record, { confirmed = false } = {}) {
   connected.collection = record.collection || local.collection || "";
   connected.sourceHash = local.sourceHash || record.sourceHash;
   connected.contentHash = local.contentHash || record.contentHash;
+  if (record.driveSource || local.driveSource) {
+    connected.driveSource = record.driveSource || local.driveSource;
+    connected.driveUpdate = record.driveUpdate || local.driveUpdate || null;
+    connected.needsLocalFile = false;
+    connected.offlineAvailable = !!(
+      record.offlineAvailable || local.offlineAvailable
+    );
+  }
   return connected;
 }
 
@@ -113,20 +124,23 @@ export function bookRecord(book) {
     cloudContentDirty,
     cloudOwnerId,
     needsLocalFile,
+    driveEdited,
     ...metadata
   } = book;
   return {
     ...metadata,
     localOnly: true,
-    chapterSummaries: book.needsLocalFile
-      ? book.chapterSummaries
-      : chapters.map((c) => ({
-          id: c.id,
-          title: c.title,
-          excluded: !!c.excluded,
-          wordCount: c.wordCount || tokenize({ chapters: [c] }).length,
-          blocks: c.blocks.map((b) => b.id),
-        })),
+    chapterSummaries:
+      book.needsLocalFile ||
+      (book.driveSource && !chapters.some((c) => c.blocks.length))
+        ? book.chapterSummaries
+        : chapters.map((c) => ({
+            id: c.id,
+            title: c.title,
+            excluded: !!c.excluded,
+            wordCount: c.wordCount || tokenize({ chapters: [c] }).length,
+            blocks: c.blocks.map((b) => b.id),
+          })),
   };
 }
 export function relinkLocalFile(imported, record, { confirmed = false } = {}) {

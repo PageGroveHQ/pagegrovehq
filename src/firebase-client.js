@@ -7,6 +7,11 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  linkWithPopup,
+  reauthenticateWithPopup,
+  browserPopupRedirectResolver,
 } from "firebase/auth";
 import {
   initializeFirestore,
@@ -23,11 +28,34 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 // persisted by Page Grove, and private book downloads never enter the service worker.
 export function createFirebaseBackend(config) {
   const app = initializeApp(config, "pagegrovehq");
-  const auth = initializeAuth(app, {persistence:browserLocalPersistence}),
+  let driveToken = null;
+  const auth = initializeAuth(app, { persistence: browserLocalPersistence }),
     db = initializeFirestore(app, { localCache: memoryLocalCache() }),
     bucket = getStorage(app);
   const session = (user) =>
-    user ? { user: { id: user.uid, email: user.email } } : null;
+    user
+      ? {
+          user: {
+            id: user.uid,
+            email: user.email,
+            google: user.providerData.some(
+              (p) => p.providerId === "google.com",
+            ),
+          },
+        }
+      : null;
+  const googleProvider = (drive = false) => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      prompt: "select_account",
+      ...(auth.currentUser?.email
+        ? { login_hint: auth.currentUser.email }
+        : {}),
+    });
+    if (drive)
+      provider.addScope("https://www.googleapis.com/auth/drive.readonly");
+    return provider;
+  };
   const owner = () => {
     if (!auth.currentUser) throw new Error("Sign in first.");
     return auth.currentUser.uid;
@@ -64,7 +92,62 @@ export function createFirebaseBackend(config) {
       });
       localStorage.setItem("pagegrove-signin-email", email);
     },
-    signOut: () => signOut(auth),
+    async signInGoogle() {
+      const provider = googleProvider();
+      // Linking from the existing session preserves its UID and owner-only records.
+      const result =
+        auth.currentUser && !session(auth.currentUser).user.google
+          ? await linkWithPopup(
+              auth.currentUser,
+              provider,
+              browserPopupRedirectResolver,
+            )
+          : await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+      return session(result.user);
+    },
+    async connectDrive() {
+      if (!auth.currentUser) throw new Error("Sign in with Google first.");
+      if (!session(auth.currentUser).user.google)
+        throw new Error("Connect Google sign-in before connecting Drive.");
+      const result = await reauthenticateWithPopup(
+        auth.currentUser,
+        googleProvider(true),
+        browserPopupRedirectResolver,
+      );
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential?.accessToken)
+        throw new Error(
+          "Google did not grant Drive access. Try connecting again.",
+        );
+      driveToken = {
+        value: credential.accessToken,
+        expires: Date.now() + 50 * 60 * 1000,
+        uid: result.user.uid,
+      };
+    },
+    driveAccess() {
+      return (
+        !!driveToken &&
+        driveToken.uid === auth.currentUser?.uid &&
+        driveToken.expires > Date.now()
+      );
+    },
+    driveAccessToken() {
+      if (!this.driveAccess()) {
+        driveToken = null;
+        throw new Error(
+          "Reconnect Google Drive in Account & sync to read or sync books.",
+        );
+      }
+      return driveToken.value;
+    },
+    disconnectDrive() {
+      driveToken = null;
+    },
+    signOut: () => {
+      driveToken = null;
+      return signOut(auth);
+    },
     async upload(path, blob, contentType) {
       if (!path.startsWith(owner() + "/"))
         throw new Error("Invalid private upload path.");

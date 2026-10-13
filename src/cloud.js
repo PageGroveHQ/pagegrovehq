@@ -3,6 +3,8 @@ import * as storage from "./storage";
 import { fingerprint } from "./enhancements";
 import { bookRecord, sameBook, combineCopies } from "./spark-sync";
 import { validateBackup, cleanSettings, tokenize } from "./engine";
+import { createDriveClient, cleanDriveFolder } from "./drive-client";
+import { scanDriveLibrary, openDriveBook } from "./drive-library";
 let config = null,
   client = null,
   inflight = null,
@@ -21,6 +23,10 @@ let state = {
   lastSynced: 0,
   pending: 0,
   cloudStorage: false,
+  driveConnected: false,
+  driveStatus: "disconnected",
+  driveProgress: null,
+  driveResult: null,
 };
 function emit(patch) {
   state = { ...state, ...patch };
@@ -32,7 +38,15 @@ export function cloudState() {
 export function needsSignInEmail() {
   return !!client?.needsEmail();
 }
-export async function ensureBookAvailable(book) {
+export async function ensureBookAvailable(book, options = {}) {
+  if (book.driveSource) {
+    const available = await openDriveBook(book, {
+      drive: driveClient(),
+      ownerId: state.session?.user.id,
+      ...options,
+    });
+    return available;
+  }
   if (book.needsLocalFile)
     throw new Error(
       "This device has the synced reading record, but not the book file. Import the same file here to continue reading.",
@@ -62,8 +76,125 @@ export async function ensureBookAvailable(book) {
   });
 }
 export async function keepBookOffline(book, enabled) {
+  if (!enabled && book.driveEdited)
+    throw new Error(
+      "Your repaired text is kept on this device. Use the updated Drive file first if you want to discard those repairs.",
+    );
   if (enabled) await ensureBookAvailable(book);
   await storage.setOfflineBook(book.id, enabled);
+}
+function driveClient() {
+  if (!client || !state.session) throw new Error("Sign in with Google first.");
+  return createDriveClient(() => client.driveAccessToken());
+}
+export async function signInGoogle() {
+  if (!client) throw new Error("Cloud accounts are not enabled yet.");
+  const session = await client.signInGoogle();
+  emit({ session, error: "", status: "ready" });
+  await syncLibrary();
+}
+export async function connectDrive() {
+  await client.connectDrive();
+  emit({ driveConnected: true, driveStatus: "ready", error: "" });
+}
+export async function disconnectDrive() {
+  cancelDriveSync();
+  client?.disconnectDrive();
+  emit({ driveConnected: false, driveStatus: "disconnected" });
+}
+export async function listDriveFolders(parent = "root") {
+  return driveClient().folders(parent);
+}
+export async function setDriveFolder(id, recursive) {
+  const user = state.session?.user.id;
+  const folder = await driveClient().file(id);
+  if (
+    folder.mimeType !== "application/vnd.google-apps.folder" ||
+    folder.trashed
+  )
+    throw new Error("Choose an available Drive folder.");
+  await storage.setMeta(
+    `drive-folder:${user}`,
+    cleanDriveFolder({ ...folder, recursive, enabled: true }),
+  );
+  await syncDriveFolder();
+}
+let driveInflight = null,
+  driveAbort = null,
+  driveLastCheck = 0;
+export function cancelDriveSync() {
+  driveAbort?.abort();
+}
+export async function syncDriveFolder({ automatic = false } = {}) {
+  if (driveInflight) return driveInflight;
+  const user = state.session?.user.id;
+  const folder =
+    user && cleanDriveFolder(await storage.getMeta(`drive-folder:${user}`));
+  if (!folder?.enabled) return;
+  if (!client?.driveAccess?.()) {
+    emit({ driveConnected: false, driveStatus: "reconnect" });
+    if (!automatic)
+      throw new Error("Reconnect Google Drive to check your books folder.");
+    return;
+  }
+  if (
+    !navigator.onLine ||
+    (automatic &&
+      (document.hidden || readingBook || Date.now() - driveLastCheck < 300000))
+  )
+    return;
+  driveLastCheck = Date.now();
+  driveAbort = new AbortController();
+  driveInflight = (async () => {
+    emit({
+      driveStatus: "syncing",
+      driveProgress: { message: "Checking your Drive folder…", percent: 0 },
+      error: "",
+    });
+    try {
+      await syncLibrary();
+      const result = await scanDriveLibrary({
+        drive: driveClient(),
+        ownerId: user,
+        folder,
+        signal: driveAbort.signal,
+        activeBook: readingBook,
+        report: (message, percent) =>
+          emit({ driveProgress: { message, percent } }),
+      });
+      if (state.session?.user.id !== user) return;
+      emit({
+        driveStatus: result.errors.length ? "partial" : "synced",
+        driveResult: result,
+        driveProgress: null,
+      });
+      await syncLibrary();
+      return result;
+    } catch (e) {
+      emit({
+        ...(/Reconnect|access expired/i.test(e.message)
+          ? { driveConnected: false }
+          : {}),
+        driveStatus: e.name === "AbortError" ? "ready" : "error",
+        driveProgress: null,
+        ...(e.name !== "AbortError" ? { error: e.message } : {}),
+      });
+      if (!automatic && e.name !== "AbortError") throw e;
+    } finally {
+      driveInflight = null;
+      driveAbort = null;
+    }
+  })();
+  return driveInflight;
+}
+export async function updateDriveBook(book) {
+  const result = await openDriveBook(book, {
+    drive: driveClient(),
+    ownerId: state.session?.user.id,
+    acceptUpdate: true,
+  });
+  await storage.saveBook(result);
+  return result;
 }
 export function subscribeCloud(fn) {
   listeners.add(fn);
@@ -101,6 +232,13 @@ export async function initializeCloud() {
     });
     window.addEventListener("online", () => syncLibrary());
     window.addEventListener("grove-local-change", schedule);
+    window.addEventListener("online", () =>
+      syncDriveFolder({ automatic: true }),
+    );
+    document.addEventListener("visibilitychange", () =>
+      syncDriveFolder({ automatic: true }),
+    );
+    setInterval(() => syncDriveFolder({ automatic: true }), 60000);
     await syncLibrary();
   } catch (e) {
     emit({ error: e.message, status: "error" });
@@ -126,6 +264,7 @@ export async function signIn(email) {
   await client.signIn(email);
 }
 export async function signOut() {
+  cancelDriveSync();
   storage.releaseReadingContent();
   const user = state.session?.user?.id;
   if (user) {
@@ -135,7 +274,14 @@ export async function signOut() {
   if (client) {
     await client.signOut();
   }
-  emit({ session: null, status: "signed-out", conflicts: [] });
+  emit({
+    session: null,
+    status: "signed-out",
+    conflicts: [],
+    driveConnected: false,
+    driveStatus: "disconnected",
+    driveResult: null,
+  });
 }
 export async function enableSync(originals = true) {
   if (!state.session) throw new Error("Sign in first.");
@@ -183,6 +329,10 @@ async function localPayload(user, item) {
       profiles: await storage.getProfiles(),
       vocabulary: await storage.getVocabulary(),
       shelves: (await storage.getMeta("shelves")) || [],
+      driveFolder: cleanDriveFolder(
+        await storage.getMeta(`drive-folder:${user}`),
+      ),
+      driveIgnored: (await storage.getMeta(`drive-ignored:${user}`)) || [],
     };
   const book = (await storage.listBooks()).find((b) => b.id === item.id);
   if (!book) return null;
@@ -239,6 +389,19 @@ async function applyDocument(user, row) {
     for (const key of ["profiles", "vocabulary", "shelves"])
       if (Array.isArray(preferences[key]))
         await storage.setMeta(key, preferences[key], { remote: true });
+    await storage.setMeta(
+      `drive-folder:${user}`,
+      cleanDriveFolder(row.payload.driveFolder),
+      { remote: true },
+    );
+    if (Array.isArray(row.payload.driveIgnored))
+      await storage.setMeta(
+        `drive-ignored:${user}`,
+        row.payload.driveIgnored
+          .filter((x) => typeof x === "string" && /^[\w-]{1,200}$/.test(x))
+          .slice(0, 10000),
+        { remote: true },
+      );
     return;
   }
   if (row.deleted) {
@@ -278,7 +441,9 @@ async function applyDocument(user, row) {
         ...row.payload,
         id: row.record_id,
         syncOwnerId: user,
-        needsLocalFile: !hasFile,
+        needsLocalFile: !hasFile && !row.payload.driveSource,
+        offlineAvailable: !!previous?.offlineAvailable,
+        driveEdited: !!previous?.driveEdited,
         cover: previous?.cover || null,
         chapters: hasFile
           ? previous.chapters

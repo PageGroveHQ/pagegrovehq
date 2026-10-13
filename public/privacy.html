@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Privacy · Page Grove HQ</title>
+    <style>
+      body {
+        font:
+          17px/1.75 system-ui,
+          sans-serif;
+        color: #263b31;
+        background: #f7f6f0;
+        margin: 0;
+      }
+      main {
+        max-width: 760px;
+        margin: auto;
+        padding: 50px 24px;
+      }
+      h1,
+      h2 {
+        font-family: Georgia, serif;
+        line-height: 1.25;
+      }
+      h1 {
+        font-size: 40px;
+      }
+      h2 {
+        font-size: 25px;
+        margin-top: 36px;
+      }
+      a {
+        color: #264b3a;
+      }
+      small {
+        color: #626f64;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="./">← Return to Page Grove</a>
+      <h1>Your library, your privacy.</h1>
+      <small>Updated October 13, 2026</small>
+      <p>
+        Page Grove HQ is a browser ebook reader hosted on GitHub Pages. Local
+        reading does not require an account. The app does not add tracking
+        analytics.
+      </p>
+      <h2>Device books</h2>
+      <p>
+        Imported files, extracted text, illustrations and reading records stay
+        in this browser. Original imports are retained separately from library
+        backups. Clearing browser site data can remove these copies. Backups are
+        files you download and manage yourself.
+      </p>
+      <h2>Google sign-in and Firebase sync</h2>
+      <p>
+        Optional Google sign-in uses Firebase Authentication in the dedicated
+        Page Grove project. With reading sync enabled, Firebase stores book
+        titles, fingerprints, reading positions, sessions, bookmarks, saved
+        excerpts, notes, vocabulary, profiles, preferences, and optional Drive
+        file/folder references. Owner-only database rules restrict access to the
+        signed-in account. Full book text, original files, illustrations and
+        Drive access tokens are not uploaded to Firebase. Saved excerpts and
+        notes may contain text you intentionally selected.
+      </p>
+      <h2>Google Drive</h2>
+      <p>
+        Drive access is separate from sign-in. Folder discovery requires
+        Google's read-only Drive permission, which technically permits viewing
+        and downloading all Drive files. Page Grove scans the folder you select
+        and, if enabled, its subfolders. The app does not upload, edit, move or
+        delete Drive files.
+      </p>
+      <p>
+        During the first folder check, supported books download temporarily to
+        extract metadata and reconnect matching reading records. Cloud books
+        then download when needed for reading. Full contents remain in memory
+        unless you choose an offline copy or repair text locally. Small covers
+        and reading metadata can be retained on the device. Access tokens stay
+        in memory and are cleared on disconnect, sign-out or reload; reconnect
+        when access expires.
+      </p>
+      <p>
+        Disconnecting Drive on a device clears its session access. To revoke
+        Google's permission, remove Page Grove from
+        <a
+          href="https://myaccount.google.com/connections"
+          target="_blank"
+          rel="noopener noreferrer"
+          >your Google account connections</a
+        >. Disconnecting or signing out does not erase existing offline copies
+        or synced notes. Use browser site-data controls to remove device data.
+      </p>
+      <h2>Other services</h2>
+      <p>
+        Dictionary lookup sends the selected word to the dictionary provider.
+        OCR runs on-device using resources served with the app. Optional AI and
+        server OCR are disabled on this deployment. GitHub, Google and the
+        dictionary provider operate under their own service privacy policies.
+      </p>
+      <h2>Account data requests</h2>
+      <p>
+        Export library backups and notes from the app. Removing an entry from
+        the shelf does not delete its Drive file; Firebase retains deletion
+        markers to prevent older devices from restoring it. Complete account
+        deletion is not automated in this version. Contact the project
+        maintainer through
+        <a href="https://github.com/PageGroveHQ/pagegrovehq/issues"
+          >the repository</a
+        >
+        to arrange private account-data removal; do not post private book
+        contents or credentials in a public issue.
+      </p>
+    </main>
+  </body>
+</html>

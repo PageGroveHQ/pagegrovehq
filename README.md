@@ -20,7 +20,8 @@ Add an EPUB, PDF, FB2, TXT, Markdown, or HTML file, or paste text. Review the im
 - Saved and per-book profiles, word/phrase/sentence/guided reading, paused context, touch gestures and compact playback controls.
 - Highlights with editable notes, a searchable notebook, Markdown export, English dictionary lookup and vocabulary review.
 - Multiple-file import queues, duplicate detection, extraction repair with stable note references, tags, want-to-read shelves, custom covers and manual ordering.
-- Optional Firebase Spark accounts and private progress/note/settings sync; book files remain on the device. Re-import the same original file to reconnect its synced reading record on another device.
+- Google sign-in for optional Firebase Spark progress/note/settings sync, with account linking for existing email users.
+- Optional read-only Google Drive folder library, including subfolders, file fingerprint matching, on-demand reading, per-device offline copies, changed-edition review and missing-file recovery. Tokens stay in memory; reconnect after reload or expiry.
 
 ### Important behavior
 
@@ -30,7 +31,7 @@ Add an EPUB, PDF, FB2, TXT, Markdown, or HTML file, or paste text. Review the im
 
 **Limits:** 100 MB input files, 180 MB expanded EPUBs, and 1,000 PDF pages. DRM-protected EPUBs and Kindle MOBI/AZW/KFX are not supported: use an unprotected EPUB edition you have permission to read. HTML imports omit external images; Markdown is treated as readable text. Complex layouts, equations, and some fixed-layout books are best reviewed in passage view. Sentence heuristics may treat abbreviations as sentence endings. This app makes no clinical or speed/comprehension guarantees.
 
-**Storage:** books remain in a browser-local library. Firebase Spark optionally syncs library records, saved excerpts, notes, progress and preferences after explicit opt-in. Full book files, extracted text and illustrations do not sync. Backup/restore transfers full libraries between devices. Clearing browser site data can remove local books, which the cloud index cannot reconstruct. Keep original files and export regular backups. GitHub Pages project sites on one account share an origin: the database, cache names, and service worker are specific to this project, but origin-level storage quota and security remain shared. Use a dedicated domain for stronger isolation. See [Firebase setup](docs/backend-setup.md) for quotas, privacy and verification limits.
+**Storage:** device imports remain local. Google Drive books use temporary in-memory content by default, with small local covers and an optional offline copy. First folder scan downloads files sequentially to extract metadata and match existing records; later scans skip unchanged books. Firebase Spark syncs reading records, saved excerpts, notes, progress, preferences, Drive references and folder settings after opt-in. Full text, originals, illustrations and Drive access tokens are never uploaded to Firebase. Text repairs pin an offline copy on the editing device. Backup/restore transfers full downloaded libraries. Keep originals and backups for local-only books. GitHub Pages project sites on one account share an origin: app-specific database/cache names prevent naming collisions, but origin-level security and quota remain shared. See [Firebase and Drive setup](docs/backend-setup.md) for configuration, quotas, privacy and live verification requirements.
 
 **Optional AI and server processing:** these are not enabled on the Spark deployment. Excerpt-selection and document-tool interfaces show their availability honestly. Local PDF OCR continues to work without a server.
 

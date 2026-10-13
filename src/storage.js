@@ -53,9 +53,13 @@ export async function consolidateBook(book, aliases, userId) {
     await tx.objectStore("outbox").delete(`${userId}:book:${id}`);
   }
   await tx.objectStore("meta").put(recovered, "recovered-sync-copies");
-  await tx
-    .objectStore("books")
-    .put({ ...upgradeBook(book), syncOwnerId: userId, updatedAt: Date.now() });
+  await tx.objectStore("books").put(
+    persistedBook({
+      ...upgradeBook(book),
+      syncOwnerId: userId,
+      updatedAt: Date.now(),
+    }),
+  );
   await enqueue(tx, book.id);
   await tx.done;
   notify();
@@ -63,7 +67,7 @@ export async function consolidateBook(book, aliases, userId) {
 function withoutContent(book) {
   return {
     ...book,
-    cover: null,
+    cover: book.driveSource && book.cover?.length < 250000 ? book.cover : null,
     chapters: book.chapters.map((c) => ({
       id: c.id,
       title: c.title,
@@ -81,8 +85,8 @@ function withoutContent(book) {
 }
 function persistedBook(book) {
   if (
-    book.cloudContentPath &&
-    !book.cloudContentDirty &&
+    ((book.cloudContentPath && !book.cloudContentDirty) ||
+      (book.driveSource && !book.driveEdited)) &&
     !book.offlineAvailable
   ) {
     if (book.chapters.some((c) => c.blocks.length))
@@ -122,6 +126,8 @@ export async function setOfflineBook(id, enabled) {
     throw new Error("Download this book before keeping it offline.");
   book.offlineAvailable = enabled;
   await saveBook(book, { remote: true });
+  if (!enabled && book.driveSource)
+    await (await database).delete("originals", id);
 }
 export function releaseReadingContent(id) {
   if (id) readingContent.delete(id);
@@ -175,7 +181,11 @@ export async function saveBook(book, options = {}) {
   if (book.cloudContentDirty) readingContent.delete(book.id);
   if (options.remote) {
     const old = await (await database).get("books", book.id);
-    if (old?.cloudContentPath !== book.cloudContentPath)
+    if (
+      old?.cloudContentPath !== book.cloudContentPath ||
+      old?.driveSource?.checksum !== book.driveSource?.checksum ||
+      old?.driveSource?.modifiedTime !== book.driveSource?.modifiedTime
+    )
       readingContent.delete(book.id);
   }
   const tx = (await database).transaction(
@@ -197,7 +207,7 @@ export async function addBook(book, original) {
   );
   await tx
     .objectStore("books")
-    .put({ ...upgradeBook(book), updatedAt: Date.now() });
+    .put(persistedBook({ ...upgradeBook(book), updatedAt: Date.now() }));
   if (original) await tx.objectStore("originals").put(original, book.id);
   await enqueue(tx, book.id);
   await tx.done;
@@ -208,6 +218,15 @@ export async function deleteBook(id, options = {}) {
     ["books", "originals", "meta", "outbox"],
     "readwrite",
   );
+  const previous = await tx.objectStore("books").get(id);
+  if (previous?.driveSource && !options.remote) {
+    const key = `drive-ignored:${previous.driveSource.ownerId}`;
+    const ignored = (await tx.objectStore("meta").get(key)) || [];
+    await tx
+      .objectStore("meta")
+      .put([...new Set([...ignored, previous.driveSource.fileId])], key);
+    await enqueue(tx, "preferences", "preferences");
+  }
   await tx.objectStore("books").delete(id);
   await tx.objectStore("originals").delete(id);
   readingContent.delete(id);
@@ -229,6 +248,12 @@ export async function patchBook(id, patch) {
       book.cloudContentPath
     )
       patch.cloudContentDirty = true;
+    if (
+      Object.hasOwn(patch, "cover") &&
+      patch.cover !== book.cover &&
+      book.driveSource
+    )
+      patch.driveCoverOverride = true;
     const tombstones = [
       ...(book.annotationTombstones || []),
       ...(patch.annotationTombstones || []),
@@ -263,13 +288,19 @@ export async function setMeta(key, value, options = {}) {
   await tx.objectStore("meta").put(value, key);
   if (
     !options.remote &&
-    ["settings", "profiles", "vocabulary", "shelves"].includes(key)
+    (["settings", "profiles", "vocabulary", "shelves"].includes(key) ||
+      key.startsWith("drive-folder:") ||
+      key.startsWith("drive-ignored:"))
   )
     await enqueue(tx, "preferences", "preferences");
   await tx.done;
   notify(
     !!options.remote ||
-      !["settings", "profiles", "vocabulary", "shelves"].includes(key),
+      !(
+        ["settings", "profiles", "vocabulary", "shelves"].includes(key) ||
+        key.startsWith("drive-folder:") ||
+        key.startsWith("drive-ignored:")
+      ),
   );
 }
 export const getProfiles = async () =>

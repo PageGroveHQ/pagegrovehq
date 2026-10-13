@@ -376,9 +376,10 @@ export default function ImportDialog({
           <div className="import-footnote">
             <ShieldCheck size={19} />
             <p>
-              Books stay on your device unless you enable cloud sync. OCR
-              resources load from this app’s hosting. Files are processed one at
-              a time so large imports don’t overwhelm your device.
+              These imports stay on your device. Connect a Google Drive folder
+              in Account & sync for cloud books. OCR resources load from this
+              app’s hosting. Files are processed one at a time so large imports
+              don’t overwhelm your device.
             </p>
           </div>
           {pending.current.length > 0 && (

@@ -101,6 +101,7 @@ function Grove() {
   const [reader, setReader] = useState(null);
   const [incomingFiles, setIncomingFiles] = useState([]);
   const [toast, setToast] = useState("");
+  const [openingBook, setOpeningBook] = useState(null);
   const [original, setOriginal] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
@@ -206,15 +207,25 @@ function Grove() {
     });
   }
   async function openBook(book, position) {
+    if (openingBook) return;
     setModal(null);
     setOriginal(null);
     let latest =
       (await storage.listBooks()).find((b) => b.id === book.id) || book;
     try {
-      latest = await cloud.ensureBookAvailable(latest);
+      if (latest.driveSource)
+        setOpeningBook({
+          message: `Opening ${latest.title} from Drive…`,
+          percent: 0,
+        });
+      latest = await cloud.ensureBookAvailable(latest, {
+        report: (message, percent) => setOpeningBook({ message, percent }),
+      });
     } catch (e) {
       notify(e.message);
       return;
+    } finally {
+      setOpeningBook(null);
     }
     lastReader.current = latest.id;
     setReader({
@@ -301,11 +312,23 @@ function Grove() {
     }
   }
   async function showDetails(book) {
-    if (book.cloudContentPath && !book.chapters.some((c) => c.blocks.length)) {
+    if (
+      (book.cloudContentPath || book.driveSource) &&
+      !book.chapters.some((c) => c.blocks.length)
+    ) {
       try {
-        book = await cloud.ensureBookAvailable(book);
+        if (book.driveSource)
+          setOpeningBook({
+            message: `Loading details for ${book.title}…`,
+            percent: 0,
+          });
+        book = await cloud.ensureBookAvailable(book, {
+          report: (message, percent) => setOpeningBook({ message, percent }),
+        });
       } catch (e) {
         notify(e.message);
+      } finally {
+        setOpeningBook(null);
       }
     }
     setSelected(book);
@@ -839,7 +862,7 @@ function Grove() {
           <footer className="library-footer">
             <span>
               <ShieldCheck size={15} />
-              Your books stay on your device.
+              Your books stay private, on your device or in Drive.
             </span>
             <span>
               {totalMinutes > 0
@@ -1053,8 +1076,8 @@ function Grove() {
                           )
                           .map((b) => ({
                             ...b,
-                          id: "recovered-" + crypto.randomUUID(),
-                          separateCopy:true,
+                            id: "recovered-" + crypto.randomUUID(),
+                            separateCopy: true,
                           })),
                         recoveredReadingRecords: copies,
                         settings,
@@ -1274,10 +1297,11 @@ function Grove() {
             </a>
           </div>
           <p className="muted">
-            No account required. No book uploads or tracking analytics. Books
-            stay in this browser; backups move your library between devices.
-            Offline reading works after the app loads. OCR’s first use downloads
-            resources from this app’s hosting; these are cached for later use.
+            No account required for local reading. No tracking analytics. Device
+            imports stay in this browser; optional Google Drive access connects
+            cloud books, and Firebase syncs reading records. Offline reading
+            requires a device copy. OCR’s first use downloads resources from
+            this app’s hosting; these are cached for later use.
           </p>
           <p className="muted">
             Included covers are original illustrations. Sample excerpts: Alice’s
@@ -1285,6 +1309,13 @@ function Grove() {
             Walden (1854); public domain in the United States.
           </p>
         </Dialog>
+      )}
+      {openingBook && (
+        <div className="book-loading" role="status">
+          <Cloud size={22} />
+          <p>{openingBook.message}</p>
+          <progress value={openingBook.percent} max="100" />
+        </div>
       )}
       {toast && (
         <div className="toast" role="status">

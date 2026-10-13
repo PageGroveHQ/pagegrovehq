@@ -2,12 +2,12 @@
 
 Dedicated project: **page-grove-hq**. Keep the project on Spark with no billing account. This application uses Firebase Authentication and Firestore for optional accounts and reading-record sync. It does not require Firebase Hosting: the website remains on GitHub Pages.
 
-Book files, full extracted text, covers, original PDFs, and illustrations stay in this browser's IndexedDB. Synced records contain titles, source-file fingerprints, reading positions, bookmarks, intentionally saved excerpts and notes, profiles, vocabulary, shelves, and reading sessions. Import the same file on another device to reconnect its reading record. Text repairs and original files do not sync. Pasted articles can be moved through a library backup.
+Device imports stay in this browser's IndexedDB. Optional Google Drive folder sync keeps newly connected books in Drive, loads their contents temporarily for reading, and allows per-device offline copies. Firebase stores reading metadata and Drive references, not original files, full text, illustrations, or Drive access tokens. Existing device copies remain offline when connected to Drive. Local passage repairs to Drive books pin an offline copy and are not uploaded to Drive or Firebase.
 
 ## Console setup
 
 1. Register the Web app **Page Grove HQ Web** inside `page-grove-hq`. Do not use another PageGroveHQ project's Firebase app.
-2. Authentication → Sign-in method: enable Email/Password and Email link (passwordless sign-in). The frontend uses email links, not password forms.
+2. Authentication → Sign-in method: enable **Google**, public-facing name **Page Grove HQ**, and the owner's support email. Keep the email provider enabled during migration. Old email callbacks remain supported, but the frontend now offers Google sign-in. From an existing email session, **Connect Google sign-in** links the provider to the existing Firebase UID. Choose the same Google email; do not delete/recreate Firebase users.
 3. Authentication → Settings → Authorized domains: add `pagegrovehq.github.io`. Local testing can use `localhost`; add `127.0.0.1` only if testing email callbacks on that host.
 4. Create a **Standard** Firestore database `(default)` in `us-east1`, starting in production mode. Publish the exact rules in `firebase/firestore.rules`. They restrict each user to their own document collection and enforce revision increments.
 5. Put the **public web configuration** in `public/cloud-config.json`, set `bookStorage` to `device`, and enable the deployment only after the rules and Auth provider are ready. Never put service-account credentials or an AI API key in this file.
@@ -17,7 +17,21 @@ CLI alternative for rules: `firebase deploy --only firestore:rules --project pag
 
 ## Free-plan limits
 
-Spark is quota-limited. Hitting a quota can stop the affected service; it does not automatically upgrade to Blaze. Email-link sign-in has a particularly small Spark email allowance, so a larger public launch should consider adding Google sign-in. See the official [Auth limits](https://firebase.google.com/docs/auth/limits) and [pricing](https://firebase.google.com/pricing).
+Spark is quota-limited. Hitting a quota can stop the affected service; it does not automatically upgrade to Blaze. Google sign-in avoids Spark's small email-link allowance. See the official [Auth limits](https://firebase.google.com/docs/auth/limits) and [pricing](https://firebase.google.com/pricing).
+
+## Google Drive configuration
+
+Enable **Google Drive API** in Google Cloud project **page-grove-hq**. Firebase supplies the Google web OAuth client; do not add any client secret or service-account key to the frontend. In Google Auth Platform, configure branding as **Page Grove HQ**, the support/developer contact, and Data Access scope `https://www.googleapis.com/auth/drive.readonly`. For personal/testing use, add the owner's Google email under Audience test users. Keep the existing authorized domain `pagegrovehq.github.io` and Firebase handler `https://page-grove-hq.firebaseapp.com/__/auth/handler`. Do not enable billing, Firebase Storage, or another project's services.
+
+Normal Google sign-in does not request Drive access. **Connect Google Drive** separately reauthenticates the signed-in Google user and requests read-only access. Google grants this across Drive; the app only scans the selected folder and optional descendants. It performs no Drive uploads, changes or deletes. Tokens stay in memory and expire; reconnect after reload or expiry. Disconnecting clears the device's token and pauses folder checks; revoke the grant separately in Google account third-party connections.
+
+First scan downloads supported files sequentially to extract titles, covers, word counts and fingerprints, reconnects matching existing records, then releases full text for cloud-only entries. Later scans skip unchanged books, flag changed editions for explicit replacement, and mark missing files without deleting notes. Checks run while the app is visible, authorized, online and outside the reader, at most every five minutes; manual checks are immediate. Removed shelf entries are suppressed on later scans, without deleting their Drive files. Errors for individual unsupported/DRM/malformed/oversized books remain visible.
+
+Drive file IDs and folder settings sync with progress through Firebase. Offline copies are per-device. Replacing a changed edition preserves numeric positions and annotations but requires review against the new text and replaces local repairs. A full library backup includes downloaded text and restores Drive books as offline copies.
+
+`drive.readonly` is a restricted scope. Personal-use apps may qualify for verification exceptions and show an unverified warning. Broader public use needs Google's restricted-scope review; transmitting restricted Drive metadata to Firebase may also require a security assessment. See [Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth) and [verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification).
+
+Google provider, token lifecycle, folder pagination, ownership, temporary caching, identity preservation and changed-file handling have synthetic regression tests. These do not substitute for the owner's live Google consent or an authenticated two-device check.
 
 Cloud Storage requires Blaze billing even though eligible usage has free allowances. It is not provisioned or used in this Spark setup. Paid AI and background server OCR also remain disabled. Local OCR and local dictionary/vocabulary tools remain available.
 

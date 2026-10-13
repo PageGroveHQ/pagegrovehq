@@ -12,9 +12,9 @@ import {
 import { Dialog } from "./components";
 import * as cloud from "./cloud";
 import * as storage from "./storage";
+import DrivePanel from "./DrivePanel";
 export default function AccountPanel({ onClose, notify, onChanged }) {
   const [state, setState] = useState(cloud.cloudState()),
-    [email, setEmail] = useState(""),
     [busy, setBusy] = useState(false),
     [sync, setSync] = useState(false),
     [jobs, setJobs] = useState([]);
@@ -48,8 +48,9 @@ export default function AccountPanel({ onClose, notify, onChanged }) {
         <h2>A private place for your library.</h2>
         <p>
           Firebase Spark sync carries library records, saved excerpts, notes,
-          profiles, and your reading position between devices. Book files stay
-          on the device. Local reading remains available without an account.
+          profiles, and your reading position between devices. Connect Google
+          Drive for your book files, or keep books on this device. Local reading
+          remains available without an account.
         </p>
       </div>
       {!state.configured ? (
@@ -62,41 +63,39 @@ export default function AccountPanel({ onClose, notify, onChanged }) {
           </p>
         </div>
       ) : !state.session ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            action(async () => {
-              await cloud.signIn(email);
-              notify(
-                cloud.cloudState().session
-                  ? "You are signed in."
-                  : "Check your email for your Page Grove sign-in link.",
-              );
-            });
-          }}
-        >
-          <label className="field">
-            Email address
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <button className="primary" type="submit" disabled={busy}>
-            <Mail size={17} />
-            {busy
-              ? "Connecting…"
-              : cloud.needsSignInEmail()
-                ? "Complete sign-in with this email"
-                : "Email me a sign-in link"}
+        <div className="google-signin">
+          <button
+            className="google-button"
+            disabled={busy}
+            onClick={() => action(cloud.signInGoogle)}
+          >
+            <GoogleMark />
+            {busy ? "Connecting…" : "Continue with Google"}
           </button>
-        </form>
+          <p className="muted">
+            Use the same Google email as your existing Page Grove account to
+            keep your synced library. No email verification links.
+          </p>
+        </div>
       ) : (
         <>
           <p className="muted">Signed in as {state.session.user.email}</p>
+          {!state.session.user.google && (
+            <div className="notice">
+              <p>
+                Connect the same Google account ({state.session.user.email}) to
+                keep your existing library and switch away from email links.
+              </p>
+              <button
+                className="google-button"
+                disabled={busy}
+                onClick={() => action(cloud.signInGoogle)}
+              >
+                <GoogleMark />
+                Connect Google sign-in
+              </button>
+            </div>
+          )}
           <div className="notice">
             <strong>
               {state.status === "synced"
@@ -123,10 +122,10 @@ export default function AccountPanel({ onClose, notify, onChanged }) {
               <p className="muted">
                 Enabling sync uploads book titles, reading positions, bookmarks,
                 highlighted excerpts, notes, profiles, and sessions to your
-                private Firebase account. Original files, full book text, and
-                illustrations stay on this device. Import the same book file on
-                another device to use its synced position and notes. Nothing is
-                shared publicly.
+                private Firebase account. Book files remain on this device or in
+                your connected Google Drive. Drive file references and your
+                selected folder also sync; book text is not uploaded to
+                Firebase. Nothing is shared publicly.
               </p>
               <button
                 className="primary"
@@ -191,6 +190,7 @@ export default function AccountPanel({ onClose, notify, onChanged }) {
               </div>
             </div>
           ))}
+          <DrivePanel state={state} action={action} busy={busy} />
           {jobs.length > 0 && (
             <>
               <div className="settings-heading">
@@ -228,8 +228,39 @@ export default function AccountPanel({ onClose, notify, onChanged }) {
       )}
       <p className="muted account-privacy">
         <ShieldCheck size={15} />
-        Synced notes are private to your account. Book files stay on this device; export backups for an additional copy.
+        Synced notes are private to your account. Books stay on this device or
+        in your private Google Drive.
       </p>
+      <a
+        className="text-button"
+        href={new URL("privacy.html", document.baseURI).href}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Privacy & Google Drive access
+      </a>
     </Dialog>
+  );
+}
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"
+      />
+      <path
+        fill="#4285F4"
+        d="M47.54 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h13.24c-.59 3.04-2.31 5.62-4.89 7.36l7.73 6C44.59 38.2 47.54 32 47.54 24.55Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.12.78-4.59l-7.98-6.19A24 24 0 0 0 0 24c0 3.87.94 7.53 2.56 10.78l7.97-6.19Z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.91-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.2C6.51 42.62 14.62 48 24 48Z"
+      />
+    </svg>
   );
 }
