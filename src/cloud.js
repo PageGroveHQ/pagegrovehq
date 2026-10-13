@@ -91,7 +91,8 @@ export async function signInGoogle() {
   if (!client) throw new Error("Cloud accounts are not enabled yet.");
   const session = await client.signInGoogle();
   emit({ session, error: "", status: "ready" });
-  await syncLibrary();
+  // Authentication is complete; slow/offline Firestore must not keep login busy.
+  void syncLibrary();
 }
 export async function connectDrive() {
   await client.connectDrive();

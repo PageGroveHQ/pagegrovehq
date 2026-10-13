@@ -15,6 +15,30 @@ async function account(page) {
     .getByRole("button", { name: "Account & sync", exact: true })
     .click();
 }
+test("blocked Google popup shows a persistent explanation and enables retry", async ({
+  page,
+}) => {
+  const blocked = backend.replace(
+    "signInGoogle:async()=>{",
+    "signInGoogle:async()=>{const failure=new Error('blocked');failure.code='auth/popup-blocked';throw failure;",
+  );
+  await page.route("**/assets/firebase-client-*.js", (route) =>
+    route.fulfill({ contentType: "text/javascript", body: blocked }),
+  );
+  await page.goto("/");
+  await account(page);
+  const button = page.getByRole("button", {
+    name: "Continue with Google",
+    exact: true,
+  });
+  await button.click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Allow popups for this Page Grove site",
+  );
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(page.getByRole("alert")).toContainText("regular browser tab");
+});
 async function rawBook(page) {
   return page.evaluate(async () => {
     const db = await new Promise((resolve) => {

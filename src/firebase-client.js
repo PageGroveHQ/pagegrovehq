@@ -23,6 +23,7 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getBlob } from "firebase/storage";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { waitForGoogle } from "./google-auth";
 
 // Firestore deliberately uses memory caching: only the small library index is
 // persisted by Page Grove, and private book downloads never enter the service worker.
@@ -97,22 +98,29 @@ export function createFirebaseBackend(config) {
       // Linking from the existing session preserves its UID and owner-only records.
       const result =
         auth.currentUser && !session(auth.currentUser).user.google
-          ? await linkWithPopup(
-              auth.currentUser,
-              provider,
-              browserPopupRedirectResolver,
+          ? await waitForGoogle(
+              linkWithPopup(
+                auth.currentUser,
+                provider,
+                browserPopupRedirectResolver,
+              ),
             )
-          : await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+          : await waitForGoogle(
+              signInWithPopup(auth, provider, browserPopupRedirectResolver),
+            );
       return session(result.user);
     },
     async connectDrive() {
       if (!auth.currentUser) throw new Error("Sign in with Google first.");
       if (!session(auth.currentUser).user.google)
         throw new Error("Connect Google sign-in before connecting Drive.");
-      const result = await reauthenticateWithPopup(
-        auth.currentUser,
-        googleProvider(true),
-        browserPopupRedirectResolver,
+      const result = await waitForGoogle(
+        reauthenticateWithPopup(
+          auth.currentUser,
+          googleProvider(true),
+          browserPopupRedirectResolver,
+        ),
+        120000,
       );
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (!credential?.accessToken)

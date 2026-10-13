@@ -13,12 +13,22 @@ import { Dialog } from "./components";
 import * as cloud from "./cloud";
 import * as storage from "./storage";
 import DrivePanel from "./DrivePanel";
+import { googleAuthMessage } from "./google-auth";
 export default function AccountPanel({ onClose, notify, onChanged }) {
   const [state, setState] = useState(cloud.cloudState()),
     [busy, setBusy] = useState(false),
+    [authWaiting, setAuthWaiting] = useState(false),
+    [longWait, setLongWait] = useState(false),
+    [actionError, setActionError] = useState(""),
     [sync, setSync] = useState(false),
     [jobs, setJobs] = useState([]);
   useEffect(() => cloud.subscribeCloud(setState), []);
+  useEffect(() => {
+    setLongWait(false);
+    if (!authWaiting) return;
+    const timer = setTimeout(() => setLongWait(true), 6000);
+    return () => clearTimeout(timer);
+  }, [authWaiting]);
   useEffect(() => {
     storage
       .getMeta("cloud-sync")
@@ -32,13 +42,18 @@ export default function AccountPanel({ onClose, notify, onChanged }) {
   }, [state.session, state.status]);
   async function action(fn) {
     setBusy(true);
+    setActionError("");
+    setAuthWaiting(fn === cloud.signInGoogle || fn === cloud.connectDrive);
     try {
       await fn();
       await onChanged();
     } catch (e) {
-      notify(e.message);
+      const message = googleAuthMessage(e);
+      setActionError(message);
+      notify(message);
     } finally {
       setBusy(false);
+      setAuthWaiting(false);
     }
   }
   return (
@@ -220,6 +235,22 @@ export default function AccountPanel({ onClose, notify, onChanged }) {
             device. Use your browser’s site-data controls on a shared computer.
           </p>
         </>
+      )}
+      {longWait && authWaiting && (
+        <div className="notice" role="status">
+          <strong>Waiting for Google’s sign-in window</strong>
+          <p>
+            Check your other tabs or windows and your browser’s blocked-popup
+            indicator. Complete the Google window if it opened. If you are using
+            an installed app or embedded browser, try this site in a regular
+            browser tab.
+          </p>
+        </div>
+      )}
+      {actionError && (
+        <p className="error-message" role="alert">
+          {actionError}
+        </p>
       )}
       {state.error && (
         <p className="error-message" role="alert">

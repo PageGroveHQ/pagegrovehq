@@ -47,6 +47,8 @@ The two-device reconciliation regression uses an in-memory Firestore transport w
 
 ## Reliability and privacy
 
+Google sign-in opens a separate window. If it appears to wait, check other tabs/windows and the browser's popup-blocked indicator; installed/embedded browser contexts may require opening the live site in a regular browser tab. The account panel shows guidance after six seconds, retains useful errors, and permits retry after an unresolved authentication timeout (60 seconds for sign-in, 120 seconds for Drive consent). A timeout stops waiting, not the underlying Google window: close an unfinished window before retrying. Library synchronization runs independently once authentication completes. A fresh Chrome session was checked to reach Google's actual sign-in screen without entering credentials; this does not prove every device's popup settings or complete live authentication.
+
 Firestore uses a memory-only SDK cache. Page Grove stores its library and a durable per-user outbox locally; original files are never deleted by Spark sync. Transactional revisions detect concurrent edits. Compatible annotations and sessions merge, while competing reading positions and notes require a choice. Annotation tombstones prevent deleted notes from returning.
 
 The owner-only read rules were checked in Firebase's Rules Playground for owner access, signed-out denial, and another-account denial. These are simulations, not a substitute for an authenticated two-device integration test. Live email delivery and cross-device sync must be verified with real sign-ins; do not claim those tests based only on a build or simulator.
