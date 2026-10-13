@@ -1,7 +1,7 @@
 import { mergeDocuments } from "./sync-merge";
 import * as storage from "./storage";
 import { fingerprint } from "./enhancements";
-import { bookRecord } from "./spark-sync";
+import { bookRecord, sameBook, combineCopies } from "./spark-sync";
 import { validateBackup, cleanSettings, tokenize } from "./engine";
 let config = null,
   client = null,
@@ -10,6 +10,7 @@ let config = null,
   readingBook = null;
 export function setReadingBook(id) {
   readingBook = id;
+  if (!id) schedule();
 }
 let state = {
   configured: false,
@@ -108,8 +109,17 @@ export async function initializeCloud() {
 }
 let timeout;
 function schedule() {
+  // Coalesce reader autosaves rather than fetching the entire cloud index for
+  // every few words. The manual Sync now action remains immediate.
+  if (readingBook && timeout) return;
   clearTimeout(timeout);
-  timeout = setTimeout(() => syncLibrary(), 2000);
+  timeout = setTimeout(
+    () => {
+      timeout = null;
+      syncLibrary();
+    },
+    readingBook ? 30000 : 2000,
+  );
 }
 export async function signIn(email) {
   if (!client) throw new Error("Cloud accounts are not enabled yet.");
@@ -232,6 +242,26 @@ async function applyDocument(user, row) {
     return;
   }
   if (row.deleted) {
+    if (row.payload?.syncRedirectTo) {
+      const local = await storage.listBooks(),
+        alias = local.find((b) => b.id === row.record_id);
+      if (alias) {
+        const target =
+          local.find((b) => b.id === row.payload.syncRedirectTo) ||
+          (await client.documents())
+            .filter(
+              (r) => !r.deleted && r.record_id === row.payload.syncRedirectTo,
+            )
+            .map(rowBook)[0];
+        if (target)
+          await storage.consolidateBook(
+            combineCopies(alias, target),
+            [alias.id],
+            user,
+          );
+      }
+      return;
+    }
     await storage.deleteBook(row.record_id, { remote: true });
     return;
   }
@@ -286,6 +316,108 @@ async function applyDocument(user, row) {
 async function writeDocument(user, item, payload, revision) {
   return client.write(item, payload, revision);
 }
+const rowBook = (row) => ({
+  ...row.payload,
+  id: row.record_id,
+  needsLocalFile: true,
+  chapters: (row.payload.chapterSummaries || []).map((c) => ({
+    ...c,
+    blocks: [],
+  })),
+});
+async function reconcileCopies(user, rows, bases) {
+  await storage.prepareBookIdentities();
+  const books = (await storage.listBooks()).filter(
+      (b) => !b.syncOwnerId || b.syncOwnerId === user,
+    ),
+    handled = new Set();
+  const redirects = (await storage.getMeta(`sync-redirects:${user}`)) || [];
+  const active = rows
+    .filter((r) => r.kind === "book" && !r.deleted)
+    .sort(
+      (a, b) =>
+        Number(
+          books.some((x) => x.syncCanonicalId === b.record_id) ||
+            b.payload.syncCanonicalId === b.record_id,
+        ) -
+          Number(
+            books.some((x) => x.syncCanonicalId === a.record_id) ||
+              a.payload.syncCanonicalId === a.record_id,
+          ) ||
+        (a.payload.addedAt || 0) - (b.payload.addedAt || 0) ||
+        a.record_id.localeCompare(b.record_id),
+    );
+  for (const row of active) {
+    if (handled.has(row.record_id)) continue;
+    const group = active.filter(
+      (r) =>
+        r.record_id === row.record_id ||
+        sameBook(r.payload, row.payload) ||
+        books.some(
+          (b) =>
+            (b.id === row.record_id && sameBook(b, r.payload)) ||
+            (b.id === r.record_id && sameBook(b, row.payload)),
+        ),
+    );
+    group.forEach((r) => handled.add(r.record_id));
+    const local = books.filter(
+      (b) =>
+        (!b.syncOwnerId || b.syncOwnerId === user) &&
+        (group.some((r) => r.record_id === b.id) || sameBook(b, row.payload)),
+    );
+    const aliases = local.filter((b) => b.id !== row.record_id);
+    const remoteAliases = group.filter((r) => r.record_id !== row.record_id);
+    if (!aliases.length && !remoteAliases.length) continue;
+    if (local.some((b) => b.id === readingBook)) continue;
+    let result = local.find((b) => b.id === row.record_id) || rowBook(row);
+    result = {
+      ...result,
+      sourceHash: result.sourceHash || row.payload.sourceHash,
+      contentHash: result.contentHash || row.payload.contentHash,
+    };
+    for (const other of remoteAliases)
+      result = combineCopies(rowBook(other), result);
+    for (const other of aliases) result = combineCopies(other, result);
+    result.syncCanonicalId = row.record_id;
+    await storage.consolidateBook(
+      result,
+      aliases.map((b) => b.id),
+      user,
+    );
+    // A device that has never seen this ID must merge against its existing cloud
+    // revision, rather than creating a second row or treating all fields as new.
+    bases[`book:${row.record_id}`] ||= row;
+    for (const other of remoteAliases)
+      if (!redirects.some((r) => r.alias.record_id === other.record_id))
+        redirects.push({ alias: other, target: row.record_id });
+  }
+  await storage.setMeta(`sync-redirects:${user}`, redirects, { remote: true });
+  await storage.setMeta(`cloud-bases:${user}`, bases, { remote: true });
+}
+async function finishRedirects(user, bases) {
+  const pending = await storage.pendingChanges(user),
+    remaining = [];
+  for (const redirect of (await storage.getMeta(`sync-redirects:${user}`)) ||
+    []) {
+    if (pending.some((i) => i.kind === "book" && i.id === redirect.target)) {
+      remaining.push(redirect);
+      continue;
+    }
+    const alias = redirect.alias;
+    const result = await writeDocument(
+      user,
+      { kind: "book", id: alias.record_id, deleted: true },
+      { ...alias.payload, syncRedirectTo: redirect.target },
+      alias.revision,
+    );
+    if (!result.accepted) {
+      remaining.push({ ...redirect, alias: result.document });
+      continue;
+    }
+    bases[`book:${alias.record_id}`] = result.document;
+  }
+  await storage.setMeta(`sync-redirects:${user}`, remaining, { remote: true });
+}
 export async function syncLibrary() {
   if (inflight) return inflight;
   if (!client || !state.session) return;
@@ -300,11 +432,25 @@ export async function syncLibrary() {
     try {
       emit({ status: "syncing", error: "" });
       let bases = (await storage.getMeta(`cloud-bases:${user}`)) || {};
+      const initialRows = await client.documents();
+      await reconcileCopies(user, initialRows, bases);
       const items = await storage.pendingChanges(user),
         blocked = [];
       emit({ pending: items.length });
       for (const item of items) {
         const payload = await localPayload(user, item);
+        if (
+          item.kind === "book" &&
+          item.id === readingBook &&
+          initialRows.some(
+            (r) =>
+              r.kind === "book" &&
+              !r.deleted &&
+              r.record_id !== item.id &&
+              sameBook(payload, r.payload),
+          )
+        )
+          continue;
         const base = bases[`${item.kind}:${item.id}`];
         let result = await writeDocument(
           user,
@@ -369,13 +515,16 @@ export async function syncLibrary() {
           );
         }
       }
+      await finishRedirects(user, bases);
       const rows = await client.documents();
       const pending = await storage.pendingChanges(user);
       for (const row of rows) {
         const key = `${row.kind}:${row.record_id}`;
         if (
           (row.kind === "book" && row.record_id === readingBook) ||
-          pending.some((i) => i.kind === row.kind && i.id === row.record_id) ||
+          (await storage.pendingChanges(user)).some(
+            (i) => i.kind === row.kind && i.id === row.record_id,
+          ) ||
           bases[key]?.revision === row.revision
         )
           continue;

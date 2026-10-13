@@ -1,6 +1,10 @@
 import { test, expect } from "@playwright/test";
 test.beforeEach(async ({ page }) => {
-  await page.route('**/cloud-config.json', route=>route.fulfill({json:{enabled:false,provider:'firebase',bookStorage:'device'}}));
+  await page.route("**/cloud-config.json", (route) =>
+    route.fulfill({
+      json: { enabled: false, provider: "firebase", bookStorage: "device" },
+    }),
+  );
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Your library." }),
@@ -112,6 +116,7 @@ test("highlights, editable notebook, export and repaired-text references", async
     .getByLabel("Your note", { exact: true })
     .fill("An edited thought.");
   await page.getByRole("button", { name: "Save note", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
     page.getByText("An edited thought.", { exact: true }),
   ).toBeVisible();
@@ -239,7 +244,7 @@ test("book status, tags, custom shelves and disabled cloud are clear", async ({
   await page.getByLabel("Reading status").selectOption("want");
   await page.getByLabel("Collection", { exact: true }).fill("Quiet evenings");
   await page.getByRole("button", { name: "Save details", exact: true }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await page
     .getByRole("textbox", { name: "Search your library" })
     .fill("evening");
@@ -255,7 +260,7 @@ test("book status, tags, custom shelves and disabled cloud are clear", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Open app settings" }).click();
   await page
-    .getByRole('dialog')
+    .getByRole("dialog")
     .getByRole("button", { name: "Account & sync", exact: true })
     .click();
   await expect(

@@ -240,7 +240,12 @@ function Grove() {
         version: 1,
         exportedAt: new Date().toISOString(),
         books: await Promise.all(
-          (await storage.listBooks()).map((b) => cloud.ensureBookAvailable(b)),
+          (await storage.listBooks())
+            .filter((b) => !b.needsLocalFile)
+            .map((b) => cloud.ensureBookAvailable(b)),
+        ),
+        syncedReadingRecords: (await storage.listBooks()).filter(
+          (b) => b.needsLocalFile,
         ),
         settings,
         profiles: await storage.getProfiles(),
@@ -1021,6 +1026,49 @@ function Grove() {
             >
               <Upload size={17} />
               Restore backup
+            </button>
+            <button
+              className="secondary"
+              onClick={async () => {
+                const copies =
+                  (await storage.getMeta("recovered-sync-copies")) || [];
+                if (!copies.length) {
+                  notify(
+                    "No recovered duplicate copies are stored on this device.",
+                  );
+                  return;
+                }
+                setBackup(
+                  new Blob(
+                    [
+                      JSON.stringify({
+                        app: "pagegrovehq-reader",
+                        version: 1,
+                        exportedAt: new Date().toISOString(),
+                        books: copies
+                          .filter((b) =>
+                            b.chapters.some((c) =>
+                              c.blocks.some((p) => p.text),
+                            ),
+                          )
+                          .map((b) => ({
+                            ...b,
+                          id: "recovered-" + crypto.randomUUID(),
+                          separateCopy:true,
+                          })),
+                        recoveredReadingRecords: copies,
+                        settings,
+                      }),
+                    ],
+                    { type: "application/json" },
+                  ),
+                );
+                notify(
+                  "Recovered copies prepared. Download the backup to inspect or restore them.",
+                );
+              }}
+            >
+              Export recovered copies
             </button>
           </div>
           {backup && (

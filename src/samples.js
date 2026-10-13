@@ -41,6 +41,7 @@ export function sampleBooks() {
     },
   ].map(({ text, chapter, ...meta }) =>
     makeBook({
+      id: "sample-" + meta.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       ...meta,
       demo: true,
       format: "SAMPLE",

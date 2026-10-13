@@ -1,6 +1,7 @@
 import { openDB } from "idb";
 import { DEFAULT_SETTINGS } from "./engine";
-import { BUILTIN_PROFILES, upgradeBook } from "./enhancements";
+import { BUILTIN_PROFILES, upgradeBook, fingerprint } from "./enhancements";
+import { contentFingerprint } from "./spark-sync";
 const database = openDB("pagegrovehq-rsvp-library-v1", 2, {
   upgrade(db) {
     if (!db.objectStoreNames.contains("books"))
@@ -13,6 +14,52 @@ const database = openDB("pagegrovehq-rsvp-library-v1", 2, {
   },
 });
 const readingContent = new Map();
+export async function prepareBookIdentities() {
+  for (const book of await listBooks()) {
+    if (book.needsLocalFile) continue;
+    let changed = false;
+    if (!book.sourceHash) {
+      const file = await getOriginal(book.id);
+      if (file) {
+        book.sourceHash = await fingerprint(file);
+        changed = true;
+      }
+    }
+    if (
+      !book.contentHash &&
+      book.chapters.some((c) => c.blocks.some((b) => b.text))
+    ) {
+      book.contentHash = await contentFingerprint(book);
+      changed = true;
+    }
+    if (changed) await saveBook(book);
+  }
+}
+export async function consolidateBook(book, aliases, userId) {
+  const tx = (await database).transaction(
+    ["books", "originals", "meta", "outbox"],
+    "readwrite",
+  );
+  const recovered =
+    (await tx.objectStore("meta").get("recovered-sync-copies")) || [];
+  for (const id of aliases) {
+    const old = await tx.objectStore("books").get(id);
+    if (!old) continue;
+    recovered.push({ ...old, recoveredAt: Date.now(), reconnectedTo: book.id });
+    const original = await tx.objectStore("originals").get(id);
+    if (original && !(await tx.objectStore("originals").get(book.id)))
+      await tx.objectStore("originals").put(original, book.id);
+    await tx.objectStore("books").delete(id);
+    await tx.objectStore("outbox").delete(`${userId}:book:${id}`);
+  }
+  await tx.objectStore("meta").put(recovered, "recovered-sync-copies");
+  await tx
+    .objectStore("books")
+    .put({ ...upgradeBook(book), syncOwnerId: userId, updatedAt: Date.now() });
+  await enqueue(tx, book.id);
+  await tx.done;
+  notify();
+}
 function withoutContent(book) {
   return {
     ...book,

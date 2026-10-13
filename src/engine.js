@@ -335,6 +335,13 @@ export function validateBackup(data) {
         : null;
     book.sourceHash =
       typeof b.sourceHash === "string" ? b.sourceHash.slice(0, 100) : "";
+    book.contentHash =
+      typeof b.contentHash === "string" ? b.contentHash.slice(0, 100) : "";
+    book.separateCopy = !!b.separateCopy;
+    book.syncCanonicalId =
+      typeof b.syncCanonicalId === "string"
+        ? b.syncCanonicalId.slice(0, 100)
+        : null;
     book.annotationTombstones = Array.isArray(b.annotationTombstones)
       ? b.annotationTombstones
           .filter((t) => typeof t.id === "string")

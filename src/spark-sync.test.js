@@ -1,7 +1,51 @@
 import { describe, it, expect } from "vitest";
 import { makeBook } from "./engine";
-import { bookRecord, relinkLocalFile } from "./spark-sync";
+import {
+  bookRecord,
+  relinkLocalFile,
+  sameBook,
+  reconnectCandidates,
+  combineCopies,
+} from "./spark-sync";
+import { sampleBooks } from "./samples";
 describe("Firebase Spark respects local book storage", () => {
+  it("uses stable sample IDs across devices, prioritizes fileless records, and never matches regular books by title alone", () => {
+    expect(sampleBooks().map((b) => b.id)).toEqual(
+      sampleBooks().map((b) => b.id),
+    );
+    const local = { id: "local", sourceHash: "file", title: "Same title" },
+      remote = { id: "remote", sourceHash: "file", needsLocalFile: true };
+    expect(reconnectCandidates(local, [local, remote])[0].id).toBe("remote");
+    expect(sameBook(local, { title: "Same title" })).toBe(false);
+    expect(sameBook(local, { ...remote, separateCopy: true })).toBe(false);
+  });
+  it("lets a reader explicitly reconnect a legacy record with no fingerprint or block map", () => {
+    const imported = makeBook({
+      title: "Legacy novel",
+      chapters: [
+        {
+          title: "One",
+          blocks: [{ type: "paragraph", text: "One two three four." }],
+        },
+      ],
+    });
+    imported.sourceHash = "file";
+    const record = {
+      ...imported,
+      id: "old-cloud",
+      sourceHash: "",
+      needsLocalFile: true,
+      chapters: [{ id: "old-chapter", title: "One", blocks: [] }],
+      chapterSummaries: [{ id: "old-chapter", title: "One" }],
+      position: 2,
+    };
+    expect(() => relinkLocalFile(imported, record)).toThrow();
+    const merged = combineCopies(imported, record, { confirmed: true });
+    expect(merged.id).toBe("old-cloud");
+    expect(merged.position).toBe(2);
+    expect(merged.sourceHash).toBe("file");
+    expect(merged.chapters[0].blocks[0].text).toBe("One two three four.");
+  });
   it("syncs metadata and deliberate saved excerpts without book text or images", () => {
     const book = makeBook({
       title: "Private book",

@@ -10,7 +10,13 @@ import {
 import { Cover, Dialog, DownloadLink } from "./components";
 import { ProfilesPanel } from "./FeaturePanels";
 import { cleanSettings } from "./engine";
-import { patchBook } from "./storage";
+import {
+  patchBook,
+  prepareBookIdentities,
+  listBooks,
+  consolidateBook,
+} from "./storage";
+import { combineCopies } from "./spark-sync";
 import * as cloud from "./cloud";
 export default function BookDetails({
   book,
@@ -34,7 +40,8 @@ export default function BookDetails({
     [cover, setCover] = useState(book.cover),
     [override, setOverride] = useState(book.readingSettings),
     [busy, setBusy] = useState(false),
-    [offline, setOffline] = useState(!!book.offlineAvailable);
+    [offline, setOffline] = useState(!!book.offlineAvailable),
+    [connectId, setConnectId] = useState("");
   const input = useRef();
   async function save(e) {
     e?.preventDefault();
@@ -303,6 +310,68 @@ export default function BookDetails({
         ))}
       </div>
       <div className="details-actions">
+        {!book.needsLocalFile &&
+          books.some((b) => b.needsLocalFile && b.id !== book.id) && (
+            <div className="notice">
+              <strong>Connect this file to a synced reading record</strong>
+              <p>
+                Use this if an older synced copy still asks for its file. Choose
+                the same book and edition. Its saved position is kept; notes are
+                joined and the separate copy is preserved for recovery.
+              </p>
+              <select
+                aria-label="Synced record to reconnect"
+                value={connectId}
+                onChange={(e) => setConnectId(e.target.value)}
+              >
+                <option value="">Choose a synced book</option>
+                {books
+                  .filter((b) => b.needsLocalFile && b.id !== book.id)
+                  .map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.title} · {b.author}
+                    </option>
+                  ))}
+              </select>
+              <button
+                className="secondary"
+                disabled={busy || !connectId}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await prepareBookIdentities();
+                    const local = await listBooks(),
+                      file = local.find((b) => b.id === book.id),
+                      target = local.find((b) => b.id === connectId);
+                    const user = cloud.cloudState().session?.user.id;
+                    if (
+                      !user ||
+                      (target.syncOwnerId && target.syncOwnerId !== user)
+                    )
+                      throw new Error(
+                        "Sign in to the account that owns the synced reading record.",
+                      );
+                    await consolidateBook(
+                      combineCopies(file, target, { confirmed: true }),
+                      [file.id],
+                      user,
+                    );
+                    await onChanged();
+                    onClose();
+                    notify(
+                      "File connected. The synced position and notes are ready.",
+                    );
+                  } catch (e) {
+                    notify(e.message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Connect file & keep synced position
+              </button>
+            </div>
+          )}
         {original && (
           <DownloadLink
             blob={original}

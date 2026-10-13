@@ -16,7 +16,11 @@ import { importFile } from "./importers";
 import { makeBook, textBlocks } from "./engine";
 import { fingerprint, repairBook } from "./enhancements";
 import { addBook, listBooks } from "./storage";
-import { relinkLocalFile } from "./spark-sync";
+import {
+  relinkLocalFile,
+  contentFingerprint,
+  reconnectCandidates,
+} from "./spark-sync";
 export default function ImportDialog({
   files = [],
   books,
@@ -94,7 +98,9 @@ export default function ImportDialog({
       );
       if (controller.signal.aborted || !mounted.current) return;
       book.sourceHash = hash;
-      const existing = (await listBooks()).find((b) => b.sourceHash === hash);
+      book.contentHash = await contentFingerprint(book);
+      const library = await listBooks();
+      const existing = reconnectCandidates(book, library)[0];
       const linked = existing?.needsLocalFile
         ? relinkLocalFile(book, existing)
         : book;
@@ -103,6 +109,14 @@ export default function ImportDialog({
         file,
         duplicate: existing?.needsLocalFile ? null : existing,
         relinked: !!existing?.needsLocalFile,
+        imported: book,
+        possibleRecords: library.filter(
+          (b) =>
+            b.needsLocalFile &&
+            !b.sourceHash &&
+            b.title?.normalize("NFKC").toLowerCase() ===
+              book.title.normalize("NFKC").toLowerCase(),
+        ),
       });
       setQueue((prev) =>
         prev.map((q) =>
@@ -131,6 +145,7 @@ export default function ImportDialog({
     if (!candidate || busy) return;
     setBusy(true);
     try {
+      if (candidate.duplicate) candidate.book.separateCopy = true;
       await addBook(candidate.book, candidate.file);
       await onAdded();
       setQueue((prev) =>
@@ -243,6 +258,52 @@ export default function ImportDialog({
                 </details>
               )}
             </div>
+          )}
+          {candidate.relinked && (
+            <div className="notice">
+              <strong>Reconnecting your saved reading</strong>
+              <p>
+                This file will open the existing record at its saved position,
+                with its notes. A new book entry will not be added.
+              </p>
+            </div>
+          )}
+          {candidate.possibleRecords?.length > 0 && !candidate.relinked && (
+            <label className="field">
+              Connect to an older synced record
+              <select
+                aria-label="Connect to an older synced record"
+                value=""
+                onChange={(e) => {
+                  const record = candidate.possibleRecords.find(
+                    (b) => b.id === e.target.value,
+                  );
+                  if (record)
+                    setCandidate({
+                      ...candidate,
+                      book: relinkLocalFile(candidate.imported, record, {
+                        confirmed: true,
+                      }),
+                      relinked: true,
+                      duplicate: null,
+                    });
+                }}
+              >
+                <option value="">
+                  Choose the reading record for this file
+                </option>
+                {candidate.possibleRecords.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.title} · {b.author} · {b.position + 1} of {b.wordCount}{" "}
+                    words
+                  </option>
+                ))}
+              </select>
+              <small>
+                This older record has no file fingerprint. Select it only if
+                this is the same book and edition.
+              </small>
+            </label>
           )}
           {editing ? (
             <RepairEditor

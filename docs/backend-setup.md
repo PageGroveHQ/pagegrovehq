@@ -21,6 +21,16 @@ Spark is quota-limited. Hitting a quota can stop the affected service; it does n
 
 Cloud Storage requires Blaze billing even though eligible usage has free allowances. It is not provisioned or used in this Spark setup. Paid AI and background server OCR also remain disabled. Local OCR and local dictionary/vocabulary tools remain available.
 
+## Reconnecting older libraries and duplicate recovery
+
+Refresh both devices, then use **Sync now** on the device with the original file first. Older imports receive their missing file fingerprint locally. Sync compares existing cloud records before publishing local entries, so matching imports and bundled samples reconnect instead of becoming new books. Sample IDs are deterministic across devices. Full text and originals remain local; only file/text fingerprints enter the reading record.
+
+If a legacy cloud record still lacks a fingerprint, import its original file and select **Connect to an older synced record** in the preview. This is an explicit choice of the same book and edition; ordinary books are never joined by title alone. If a full local copy already exists beside a fileless synced record, open the full copy's **Details**, choose the intended record, and click **Connect file & keep synced position**.
+
+Automatic reconciliation keeps the established record, joins annotations and sessions, and records another meaningful reading position as a recovered bookmark. Consolidated local copies are retained in the recovery archive, and their original bytes are retained. **Settings → Export recovered copies** exports those snapshots. Cloud aliases become revisioned redirects only after the combined record has uploaded; they retain their prior metadata as tombstones. Deliberately choosing **Add another copy** creates a separate copy that reconciliation respects. Files currently open in a reader wait until the reader closes before being joined.
+
+The two-device reconciliation regression uses an in-memory Firestore transport with real IndexedDB operations; it tests migration, import-before-download, duplicate joining, note preservation, and file retention. It does not impersonate real users or replace a live authenticated check.
+
 ## Reliability and privacy
 
 Firestore uses a memory-only SDK cache. Page Grove stores its library and a durable per-user outbox locally; original files are never deleted by Spark sync. Transactional revisions detect concurrent edits. Compatible annotations and sessions merge, while competing reading positions and notes require a choice. Annotation tombstones prevent deleted notes from returning.
