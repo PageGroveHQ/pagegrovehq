@@ -5,6 +5,7 @@ import { bookRecord, sameBook, combineCopies } from "./spark-sync";
 import { validateBackup, cleanSettings, tokenize } from "./engine";
 import { createDriveClient, cleanDriveFolder } from "./drive-client";
 import { scanDriveLibrary, openDriveBook } from "./drive-library";
+import { coverThumbnail } from "./cover-thumbnail";
 let config = null,
   client = null,
   inflight = null,
@@ -324,6 +325,7 @@ async function uploadContent(user, book) {
   return path;
 }
 async function localPayload(user, item) {
+  if (item.deleted) return item.payload || null;
   if (item.kind === "preferences")
     return {
       settings: await storage.getSettings(),
@@ -338,7 +340,7 @@ async function localPayload(user, item) {
   const book = (await storage.listBooks()).find((b) => b.id === item.id);
   if (!book) return null;
   if (config.bookStorage !== "cloud") {
-    return bookRecord(book);
+    return { ...bookRecord(book), coverThumbnail: await coverThumbnail(book.cover) || book.coverThumbnail || null };
   }
   const contentPath = await uploadContent(user, book);
   const {
@@ -445,7 +447,7 @@ async function applyDocument(user, row) {
         needsLocalFile: !hasFile && !row.payload.driveSource,
         offlineAvailable: !!previous?.offlineAvailable,
         driveEdited: !!previous?.driveEdited,
-        cover: previous?.cover || null,
+        cover: row.payload.coverThumbnail || previous?.cover || null,
         chapters: hasFile
           ? previous.chapters
           : (row.payload.chapterSummaries || []).map((c) => ({
@@ -599,7 +601,32 @@ export async function syncLibrary() {
       emit({ status: "syncing", error: "" });
       let bases = (await storage.getMeta(`cloud-bases:${user}`)) || {};
       const initialRows = await client.documents();
+      // A stale local edit must not resurrect a book removed on another device.
+      // Preserve the stale copy for recovery before accepting the tombstone.
+      for (const row of initialRows.filter(r => r.kind === "book" && r.deleted && !r.payload?.syncRedirectTo)) {
+        const local = (await storage.listBooks()).filter(b =>
+          (!b.syncOwnerId || b.syncOwnerId === user) &&
+          (b.id === row.record_id || sameBook(b, row.payload || {})));
+        for (const book of local) {
+          if (book.id === readingBook) continue;
+          const queued = (await storage.pendingChanges(user)).filter(i => i.kind === "book" && i.id === book.id);
+          const recovered = (await storage.getMeta(`sync-deleted-copies:${user}`)) || [];
+          await storage.setMeta(`sync-deleted-copies:${user}`, [...recovered.filter(b => b.id !== book.id), book], { remote: true });
+          await storage.deleteBook(book.id, { remote: true });
+          for (const item of queued) await storage.acknowledgeChange(item);
+          bases[`book:${book.id}`] = row;
+        }
+      }
       await reconcileCopies(user, initialRows, bases);
+      // Backfill artwork for books synced before cover thumbnails were supported.
+      for (const book of await storage.listBooks()) {
+        if (book.syncOwnerId && book.syncOwnerId !== user) continue;
+        const remote = initialRows.find(r => r.kind === "book" && !r.deleted && r.record_id === book.id);
+        if (remote && !remote.payload.coverThumbnail && book.cover) {
+          const thumbnail = await coverThumbnail(book.cover);
+          if (thumbnail) await storage.patchBook(book.id, { coverThumbnail: thumbnail });
+        }
+      }
       const items = await storage.pendingChanges(user),
         blocked = [];
       emit({ pending: items.length });
@@ -626,6 +653,21 @@ export async function syncLibrary() {
         );
         if (!result.accepted) {
           const remote = result.document;
+          if (item.deleted && remote.deleted) {
+            bases[`${item.kind}:${item.id}`] = remote;
+            await storage.setMeta(`cloud-bases:${user}`, bases, { remote: true });
+            await storage.acknowledgeChange(item);
+            continue;
+          }
+          if (item.deleted && !remote.deleted) {
+            result = await writeDocument(user, item, payload || remote.payload, remote.revision);
+            if (result.accepted) {
+              bases[`${item.kind}:${item.id}`] = result.document;
+              await storage.setMeta(`cloud-bases:${user}`, bases, { remote: true });
+              await storage.acknowledgeChange(item);
+              continue;
+            }
+          }
           const merged =
             item.deleted || remote.deleted
               ? { value: payload, conflicts: ["Book deletion"] }

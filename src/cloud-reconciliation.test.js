@@ -56,6 +56,47 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("two-device Spark sync, including migration and late file attachment", () => {
+  it("removes stale and independently imported matching copies after a remote deletion", async () => {
+    server.rows.clear();
+    const a = await device();
+    const book = makeBook({ id: "removed", title: "Removed book", chapters: [{ title: "One", blocks: [{ type: "paragraph", text: "One two three." }] }] });
+    book.sourceHash = "same-file";
+    await a.storage.addBook(book);
+    await a.cloud.enableSync(false);
+    const old = structuredClone(server.rows.get("book:removed"));
+    await a.storage.deleteBook(book.id);
+    await a.cloud.syncLibrary();
+    expect(server.rows.get("book:removed").deleted).toBe(true);
+    expect(server.rows.get("book:removed").payload.sourceHash).toBe("same-file");
+    const b = await device();
+    await b.storage.addBook({ ...book, position: 2 });
+    await b.storage.addBook({ ...book, id: "other-browser-copy" });
+    await b.storage.setMeta("cloud-bases:reader", { "book:removed": old });
+    await b.cloud.enableSync(false);
+    expect(await b.storage.listBooks()).toEqual([]);
+    expect(b.cloud.cloudState().conflicts).toEqual([]);
+    expect(server.rows.get("book:removed").deleted).toBe(true);
+    expect(server.rows.has("book:other-browser-copy")).toBe(false);
+    expect(await b.storage.getMeta("sync-deleted-copies:reader")).toHaveLength(2);
+  });
+  it("backfills small covers and restores them on a fresh device without downloading book text", async () => {
+    server.rows.clear();
+    const a = await device();
+    const book = makeBook({ id: "covered", title: "Covered book", chapters: [{ title: "One", blocks: [{ type: "paragraph", text: "Private text stays local." }] }] });
+    book.cover = "data:image/png;base64,aGVsbG8=";
+    await a.storage.addBook(book);
+    await a.cloud.enableSync(false);
+    expect(server.rows.get("book:covered").payload.coverThumbnail).toBe(book.cover);
+    delete server.rows.get("book:covered").payload.coverThumbnail;
+    await a.cloud.syncLibrary();
+    expect(server.rows.get("book:covered").payload.coverThumbnail).toBe(book.cover);
+    const b = await device();
+    await b.cloud.enableSync(false);
+    const restored = (await b.storage.listBooks())[0];
+    expect(restored.cover).toBe(book.cover);
+    expect(restored.needsLocalFile).toBe(true);
+    expect(JSON.stringify(server.rows.get("book:covered"))).not.toContain("Private text stays local.");
+  });
   it("backfills legacy hashes, joins local imports to cloud IDs, and retires duplicates without losing files or notes", async () => {
     server.rows.clear();
     const text = "One two three four five six seven eight.";

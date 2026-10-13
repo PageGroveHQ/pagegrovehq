@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 import { DEFAULT_SETTINGS } from "./engine";
 import { BUILTIN_PROFILES, upgradeBook, fingerprint } from "./enhancements";
-import { contentFingerprint } from "./spark-sync";
+import { contentFingerprint, bookRecord } from "./spark-sync";
 const database = openDB("pagegrovehq-rsvp-library-v1", 2, {
   upgrade(db) {
     if (!db.objectStoreNames.contains("books"))
@@ -145,7 +145,7 @@ const notify = (remote = false) => {
     if (!remote) window.dispatchEvent(new Event("grove-local-change"));
   }
 };
-async function enqueue(tx, id, kind = "book", deleted = false) {
+async function enqueue(tx, id, kind = "book", deleted = false, payload = null) {
   const config = await tx.objectStore("meta").get("cloud-sync");
   if (!config?.enabled || !config.userId) return;
   if (kind === "book") {
@@ -158,6 +158,7 @@ async function enqueue(tx, id, kind = "book", deleted = false) {
     id,
     kind,
     deleted,
+    ...(deleted && payload ? { payload } : {}),
     userId: config.userId,
     generation: crypto.randomUUID(),
     queuedAt: Date.now(),
@@ -230,7 +231,7 @@ export async function deleteBook(id, options = {}) {
   await tx.objectStore("books").delete(id);
   await tx.objectStore("originals").delete(id);
   readingContent.delete(id);
-  if (!options.remote) await enqueue(tx, id, "book", true);
+  if (!options.remote) await enqueue(tx, id, "book", true, previous && bookRecord(previous));
   await tx.done;
   notify(!!options.remote);
 }
